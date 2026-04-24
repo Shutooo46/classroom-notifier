@@ -46,6 +46,19 @@ export default function Home() {
           >
             ログアウト
           </button>
+          <button
+  onClick={async () => {
+    await fetch("/api/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assignments }),
+    });
+    alert("Discordに通知を送りました！");
+  }}
+  className="bg-green-500 text-white px-4 py-2 rounded text-sm"
+>
+  通知を送る
+</button>
         </div>
       </div>
 
