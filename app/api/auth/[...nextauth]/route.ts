@@ -23,8 +23,7 @@ export const authOptions = {
         token.refreshToken = account.refresh_token;
         token.expiresAt = account.expires_at;
 
-        // Supabaseにトークンを保存
-        await supabase
+        const { error } = await supabase
           .from("user_tokens")
           .upsert({
             user_id: token.sub,
@@ -53,7 +52,6 @@ export const authOptions = {
         token.accessToken = tokens.access_token;
         token.expiresAt = Math.floor(Date.now() / 1000 + tokens.expires_in);
 
-        // リフレッシュ後もSupabaseを更新
         await supabase
           .from("user_tokens")
           .update({
