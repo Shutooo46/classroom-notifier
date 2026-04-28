@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import { supabase } from "@/lib/supabase";
 
 export const authOptions = {
   providers: [
@@ -21,6 +22,15 @@ export const authOptions = {
         token.accessToken = account.access_token;
         token.refreshToken = account.refresh_token;
         token.expiresAt = account.expires_at;
+
+        const { error } = await supabase
+          .from("user_tokens")
+          .upsert({
+            user_id: token.sub,
+            access_token: account.access_token,
+            refresh_token: account.refresh_token,
+            expires_at: account.expires_at,
+          }, { onConflict: "user_id" });
       }
 
       if (Date.now() < (token.expiresAt as number) * 1000) {
@@ -41,6 +51,15 @@ export const authOptions = {
         const tokens = await response.json();
         token.accessToken = tokens.access_token;
         token.expiresAt = Math.floor(Date.now() / 1000 + tokens.expires_in);
+
+        await supabase
+          .from("user_tokens")
+          .update({
+            access_token: tokens.access_token,
+            expires_at: Math.floor(Date.now() / 1000 + tokens.expires_in),
+          })
+          .eq("user_id", token.sub);
+
       } catch {
         token.error = "RefreshTokenError";
       }

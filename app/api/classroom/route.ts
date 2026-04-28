@@ -37,7 +37,7 @@ export async function GET() {
   { headers: { Authorization: `Bearer ${accessToken}` } }
 );
 const subData = await subRes.json();
-console.log("提出状況:", JSON.stringify(subData.studentSubmissions?.[0]));
+//console.log("提出状況:", JSON.stringify(subData.studentSubmissions?.[0]));
 const submissions = subData.studentSubmissions || [];
 const submission = submissions[0];
 const submissionState = submission?.state || "NEW";
