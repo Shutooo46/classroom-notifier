@@ -13,6 +13,14 @@ export async function GET(request: Request) {
   }
 
   for (const user of users) {
+    // ユーザー設定を取得（なければデフォルト60分）
+    const { data: settings } = await supabase
+      .from("user_settings")
+      .select("reminder_minutes")
+      .eq("user_id", user.user_id)
+      .single();
+    const reminderMinutes = settings?.reminder_minutes ?? 60;
+
     const coursesRes = await fetch(
       "https://classroom.googleapis.com/v1/courses?courseStates=ACTIVE",
       { headers: { Authorization: `Bearer ${user.access_token}` } }
@@ -61,18 +69,20 @@ export async function GET(request: Request) {
             notification_type: "new",
           });
         }
+
+        // 提出状況を取得
         const subRes = await fetch(
-  `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork/${assignment.id}/studentSubmissions`,
-  { headers: { Authorization: `Bearer ${user.access_token}` } }
-);
-const subData = await subRes.json();
-const submission = subData.studentSubmissions?.[0];
-const submissionState = submission?.state || "NEW";
-const submitted =
-  submissionState === "TURNED_IN" ||
-  submissionState === "SUBMITTED" ||
-  submissionState === "RETURNED";
-        // 期限前通知（24時間前）
+          `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork/${assignment.id}/studentSubmissions`,
+          { headers: { Authorization: `Bearer ${user.access_token}` } }
+        );
+        const subData = await subRes.json();
+        const submission = subData.studentSubmissions?.[0];
+        const submissionState = submission?.state || "NEW";
+        const submitted =
+          submissionState === "TURNED_IN" ||
+          submissionState === "SUBMITTED" ||
+          submissionState === "RETURNED";
+
         if (assignment.dueDate) {
           const due = new Date(
             assignment.dueDate.year,
@@ -83,7 +93,9 @@ const submitted =
           );
           const now = new Date();
           const hoursUntilDue = (due.getTime() - now.getTime()) / (1000 * 60 * 60);
+          const minutesUntilDue = hoursUntilDue * 60;
 
+          // 期限前24時間通知
           if (hoursUntilDue > 0 && hoursUntilDue <= 24) {
             const { data: existing24h } = await supabase
               .from("notified_assignments")
@@ -100,7 +112,7 @@ const submitted =
                 body: JSON.stringify({
                   embeds: [{
                     title: "⏰ 期限まで24時間を切りました！",
-                    color: 0xff0000,
+                    color: 0xff0000, // 赤
                     fields: [
                       { name: "課題", value: assignment.title, inline: false },
                       { name: "コース", value: course.name, inline: false },
@@ -115,6 +127,42 @@ const submitted =
                 user_id: user.user_id,
                 notified_at: new Date().toISOString(),
                 notification_type: "24h",
+              });
+            }
+          }
+
+          // 未提出確認通知（X分前・未提出のみ）
+          if (minutesUntilDue > 0 && minutesUntilDue <= reminderMinutes && !submitted) {
+            const { data: existingReminder } = await supabase
+              .from("notified_assignments")
+              .select("id")
+              .eq("assignment_id", assignment.id)
+              .eq("user_id", user.user_id)
+              .eq("notification_type", "reminder")
+              .single();
+
+            if (!existingReminder) {
+              await fetch(process.env.DISCORD_WEBHOOK_URL!, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  embeds: [{
+                    title: "🚨 期限まであと少し！まだ未提出です！",
+                    color: 0xff6600, // オレンジ
+                    fields: [
+                      { name: "課題", value: assignment.title, inline: false },
+                      { name: "コース", value: course.name, inline: false },
+                      { name: "期限", value: due.toLocaleString("ja-JP"), inline: false },
+                      { name: "残り時間", value: `約${Math.ceil(minutesUntilDue)}分`, inline: false },
+                    ]
+                  }]
+                }),
+              });
+              await supabase.from("notified_assignments").insert({
+                assignment_id: assignment.id,
+                user_id: user.user_id,
+                notified_at: new Date().toISOString(),
+                notification_type: "reminder",
               });
             }
           }
