@@ -43,7 +43,15 @@ export async function GET(request: Request) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              content: `📚 新しい課題が追加されました！\n**${assignment.title}**\nコース: ${course.name}`,
+              embeds: [{
+                title: "📚 新しい課題が追加されました！",
+                color: 0x4285f4,
+                fields: [
+                  { name: "課題", value: assignment.title, inline: false },
+                  { name: "コース", value: course.name, inline: false },
+                  { name: "期限", value: assignment.dueDate ? new Date(assignment.dueDate.year, assignment.dueDate.month - 1, assignment.dueDate.day, assignment.dueTime?.hours || 23, assignment.dueTime?.minutes || 59).toLocaleString("ja-JP") : "期限なし", inline: false },
+                ]
+              }]
             }),
           });
           await supabase.from("notified_assignments").insert({
@@ -53,7 +61,17 @@ export async function GET(request: Request) {
             notification_type: "new",
           });
         }
-
+        const subRes = await fetch(
+  `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork/${assignment.id}/studentSubmissions`,
+  { headers: { Authorization: `Bearer ${user.access_token}` } }
+);
+const subData = await subRes.json();
+const submission = subData.studentSubmissions?.[0];
+const submissionState = submission?.state || "NEW";
+const submitted =
+  submissionState === "TURNED_IN" ||
+  submissionState === "SUBMITTED" ||
+  submissionState === "RETURNED";
         // 期限前通知（24時間前）
         if (assignment.dueDate) {
           const due = new Date(
@@ -80,7 +98,16 @@ export async function GET(request: Request) {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  content: `⏰ 期限まで24時間を切りました！\n**${assignment.title}**\nコース: ${course.name}\n期限: ${due.toLocaleString("ja-JP")}`,
+                  embeds: [{
+                    title: "⏰ 期限まで24時間を切りました！",
+                    color: 0xff0000,
+                    fields: [
+                      { name: "課題", value: assignment.title, inline: false },
+                      { name: "コース", value: course.name, inline: false },
+                      { name: "期限", value: due.toLocaleString("ja-JP"), inline: false },
+                      { name: "提出状況", value: submitted ? "✅ 提出済み" : "❌ 未提出", inline: false },
+                    ]
+                  }]
                 }),
               });
               await supabase.from("notified_assignments").insert({
