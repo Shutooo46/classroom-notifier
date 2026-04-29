@@ -112,7 +112,7 @@ export async function GET(request: Request) {
                 body: JSON.stringify({
                   embeds: [{
                     title: "⏰ 期限まで24時間を切りました！",
-                    color: 0xff0000, // 赤
+                    color: 0xff6600,
                     fields: [
                       { name: "課題", value: assignment.title, inline: false },
                       { name: "コース", value: course.name, inline: false },
@@ -148,7 +148,7 @@ export async function GET(request: Request) {
                 body: JSON.stringify({
                   embeds: [{
                     title: "🚨 期限まであと少し！まだ未提出です！",
-                    color: 0xff6600, // オレンジ
+                    color: 0xff0000,
                     fields: [
                       { name: "課題", value: assignment.title, inline: false },
                       { name: "コース", value: course.name, inline: false },
