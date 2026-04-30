@@ -45,11 +45,11 @@ function AssignmentCard({ assignment }: { assignment: Assignment }) {
         </div>
       </div>
       <button
-  onClick={() => window.open(assignment.alternateLink, "_blank")}
-  className="text-sm text-blue-500 hover:underline flex-shrink-0 ml-4"
->
-  開く
-</button>
+        onClick={() => window.open(assignment.alternateLink, "_blank")}
+        className="text-sm text-blue-500 hover:underline flex-shrink-0 ml-4"
+      >
+        開く
+      </button>
     </div>
   );
 }
@@ -78,11 +78,80 @@ function Section({ title, assignments, defaultOpen = true }: { title: string; as
   );
 }
 
+function SettingsModal({ onClose, userId }: { onClose: () => void; userId: string }) {
+  const [minutes, setMinutes] = useState(60);
+  const [saving, setSaving] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((res) => res.json())
+      .then((d) => {
+        if (d.reminder_minutes) setMinutes(d.reminder_minutes);
+        setLoaded(true);
+      });
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reminder_minutes: minutes }),
+    });
+    setSaving(false);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl p-6 w-80 shadow-xl">
+        <h2 className="text-lg font-bold mb-4">通知設定</h2>
+        {!loaded ? (
+          <p className="text-gray-400 text-sm">読み込み中...</p>
+        ) : (
+          <>
+            <label className="block text-sm text-gray-600 mb-2">
+              未提出リマインダー（期限の何分前に通知するか）
+            </label>
+            <div className="flex items-center gap-3 mb-6">
+              <input
+                type="number"
+                min={1}
+                max={1440}
+                value={minutes}
+                onChange={(e) => setMinutes(Number(e.target.value))}
+                className="border rounded px-3 py-2 w-24 text-center text-lg"
+              />
+              <span className="text-gray-600">分前</span>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 border border-gray-300 text-gray-600 py-2 rounded-lg text-sm"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={save}
+                disabled={saving}
+                className="flex-1 bg-blue-500 text-white py-2 rounded-lg text-sm disabled:opacity-50"
+              >
+                {saving ? "保存中..." : "保存"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const { data: session } = useSession();
   const [data, setData] = useState<ClassroomData | null>(null);
   const [loading, setLoading] = useState(false);
-  const [notifying, setNotifying] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     if (session) {
@@ -90,30 +159,11 @@ export default function Home() {
       fetch("/api/classroom")
         .then((res) => res.json())
         .then((d) => {
-          console.log("取得データ:", d); // ← これを追加
           setData(d);
           setLoading(false);
         });
     }
   }, [session]);
-
-  const sendNotification = async () => {
-    if (!data) return;
-    setNotifying(true);
-    const assignments = [
-      ...data.noDue,
-      ...data.thisWeek,
-      ...data.nextWeek,
-      ...data.later,
-    ];
-    await fetch("/api/notify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ assignments: [{ courseName: "", assignments }] }),
-    });
-    setNotifying(false);
-    alert("Discordに通知を送りました！");
-  };
 
   if (!session) {
     return (
@@ -136,11 +186,11 @@ export default function Home() {
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-500">{session.user?.email}</span>
           <button
-            onClick={sendNotification}
-            disabled={notifying}
-            className="bg-green-500 text-white px-4 py-2 rounded text-sm disabled:opacity-50"
+            onClick={() => setShowSettings(true)}
+            className="text-gray-500 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100"
+            title="通知設定"
           >
-            {notifying ? "送信中..." : "通知を送る"}
+            🔔
           </button>
           <button
             onClick={() => signOut()}
@@ -150,6 +200,13 @@ export default function Home() {
           </button>
         </div>
       </div>
+
+      {showSettings && (
+        <SettingsModal
+          onClose={() => setShowSettings(false)}
+          userId={(session.user as any)?.id || ""}
+        />
+      )}
 
       {loading ? (
         <p className="text-gray-500">課題を読み込み中...</p>

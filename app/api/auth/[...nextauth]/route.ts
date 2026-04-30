@@ -66,10 +66,11 @@ export const authOptions = {
       return token;
     },
     async session({ session, token }: any) {
-      session.accessToken = token.accessToken;
-      session.error = token.error;
-      return session;
-    },
+  session.accessToken = token.accessToken;
+  session.error = token.error;
+  session.userId = token.sub;
+  return session;
+},
   },
 };
 
