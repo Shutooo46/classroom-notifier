@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession, signIn, signOut } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 type Assignment = {
   id: string;
@@ -78,8 +78,61 @@ function Section({ title, assignments, defaultOpen = true }: { title: string; as
   );
 }
 
+function PickerColumn({ values, selected, onChange, label }: {
+  values: string[];
+  selected: number;
+  onChange: (val: number) => void;
+  label: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const itemHeight = 44;
+
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.scrollTop = selected * itemHeight;
+    }
+  }, [selected]);
+
+  const handleScroll = () => {
+    if (ref.current) {
+      const index = Math.round(ref.current.scrollTop / itemHeight);
+      onChange(Math.min(Math.max(index, 0), values.length - 1));
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center">
+      <div className="relative w-20 h-[132px]">
+        <div className="absolute inset-x-0 top-[44px] h-[44px] bg-blue-50 rounded-lg pointer-events-none" />
+        <div
+          ref={ref}
+          onScroll={handleScroll}
+          className="h-full overflow-y-scroll snap-y snap-mandatory"
+          style={{ scrollbarWidth: 'none', scrollSnapType: 'y mandatory' }}
+        >
+          <div style={{ height: itemHeight }} />
+          {values.map((v, i) => (
+            <div
+              key={i}
+              style={{ height: itemHeight, scrollSnapAlign: 'center' }}
+              className={`relative z-20 flex items-center justify-center text-2xl font-bold transition-colors ${
+                selected === i ? "text-blue-500" : "text-gray-300"
+              }`}
+            >
+              {v}
+            </div>
+          ))}
+          <div style={{ height: itemHeight }} />
+        </div>
+      </div>
+      <span className="text-sm text-gray-500 mt-2">{label}</span>
+    </div>
+  );
+}
+
 function SettingsModal({ onClose }: { onClose: () => void }) {
-  const [minutes, setMinutes] = useState(60);
+  const [hours, setHours] = useState(1);
+  const [mins, setMins] = useState(0);
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -87,23 +140,28 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
     fetch("/api/settings")
       .then((res) => res.json())
       .then((d) => {
-        if (d.reminder_minutes) setMinutes(d.reminder_minutes);
+        if (d.reminder_minutes) {
+          setHours(Math.floor(d.reminder_minutes / 60));
+          setMins(d.reminder_minutes % 60);
+        }
         setLoaded(true);
       });
   }, []);
 
   const save = async () => {
     setSaving(true);
+    const totalMinutes = hours * 60 + mins;
     await fetch("/api/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reminder_minutes: minutes }),
+      body: JSON.stringify({ reminder_minutes: totalMinutes }),
     });
     setSaving(false);
     onClose();
   };
 
-  const presets = [30, 60, 120];
+  const hourValues = Array.from({ length: 24 }, (_, i) => String(i));
+  const minValues = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
 
   return (
     <div style={{ backgroundColor: 'rgba(0,0,0,0.4)' }} className="fixed inset-0 flex items-center justify-center z-50">
@@ -117,34 +175,22 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
           <p className="text-gray-400 text-sm text-center py-4">読み込み中...</p>
         ) : (
           <>
-            <p className="text-sm text-gray-500 mb-3">未提出リマインダー（期限の何分前に通知）</p>
+            <p className="text-sm text-gray-500 mb-4">未提出リマインダー（期限の何時間・何分前に通知）</p>
 
-            <div className="flex gap-2 mb-4">
-              {presets.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setMinutes(p)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                    minutes === p
-                      ? "bg-blue-500 text-white border-blue-500"
-                      : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
-                  }`}
-                >
-                  {p}分
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-3 mb-6 bg-gray-50 rounded-xl px-4 py-3">
-              <input
-                type="number"
-                min={1}
-                max={1440}
-                value={minutes}
-                onChange={(e) => setMinutes(Number(e.target.value))}
-                className="bg-transparent w-20 text-2xl font-bold text-gray-800 text-center outline-none"
+            <div className="flex items-center justify-center gap-4 mb-8 bg-gray-50 rounded-2xl py-4 px-6">
+              <PickerColumn
+                values={hourValues}
+                selected={hours}
+                onChange={setHours}
+                label="時間"
               />
-              <span className="text-gray-500">分前</span>
+              <span className="text-2xl font-bold text-gray-400 mb-6">:</span>
+              <PickerColumn
+                values={minValues}
+                selected={mins}
+                onChange={setMins}
+                label="分"
+              />
             </div>
 
             <div className="flex gap-3">
