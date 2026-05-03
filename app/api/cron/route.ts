@@ -1,5 +1,23 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+
+async function summarizeAssignment(title: string, description: string): Promise<string> {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const prompt = `以下の大学の課題内容を3行以内で簡潔に日本語で要約してください。課題名と説明文から何をすればいいか分かるように要約してください。
+
+課題名: ${title}
+説明: ${description || "説明なし"}`;
+
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  } catch {
+    return "要約を取得できませんでした";
+  }
+}
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -13,7 +31,6 @@ export async function GET(request: Request) {
   }
 
   for (const user of users) {
-    // ユーザー設定を取得（なければデフォルト60分）
     const { data: settings } = await supabase
       .from("user_settings")
       .select("reminder_minutes")
@@ -37,6 +54,23 @@ export async function GET(request: Request) {
       const assignments = workData.courseWork || [];
 
       for (const assignment of assignments) {
+        // 2週間以上前の課題はスキップ
+        if (assignment.dueDate) {
+          const due = new Date(
+            assignment.dueDate.year,
+            assignment.dueDate.month - 1,
+            assignment.dueDate.day
+          );
+          const twoWeeksAgo = new Date();
+          twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+          if (due < twoWeeksAgo) continue;
+        } else {
+          const createdAt = new Date(assignment.creationTime);
+          const twoWeeksAgo = new Date();
+          twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+          if (createdAt < twoWeeksAgo) continue;
+        }
+
         // 新着通知
         const { data: existingNew } = await supabase
           .from("notified_assignments")
@@ -47,6 +81,11 @@ export async function GET(request: Request) {
           .single();
 
         if (!existingNew) {
+          const summary = await summarizeAssignment(
+            assignment.title,
+            assignment.description || ""
+          );
+
           await fetch(process.env.DISCORD_WEBHOOK_URL!, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -58,6 +97,7 @@ export async function GET(request: Request) {
                   { name: "課題", value: assignment.title, inline: false },
                   { name: "コース", value: course.name, inline: false },
                   { name: "期限", value: assignment.dueDate ? new Date(assignment.dueDate.year, assignment.dueDate.month - 1, assignment.dueDate.day, assignment.dueTime?.hours || 23, assignment.dueTime?.minutes || 59).toLocaleString("ja-JP") : "期限なし", inline: false },
+                  { name: "📝 AI要約", value: summary, inline: false },
                 ]
               }]
             }),
@@ -106,6 +146,11 @@ export async function GET(request: Request) {
               .single();
 
             if (!existing24h) {
+              const summary = await summarizeAssignment(
+                assignment.title,
+                assignment.description || ""
+              );
+
               await fetch(process.env.DISCORD_WEBHOOK_URL!, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -118,6 +163,7 @@ export async function GET(request: Request) {
                       { name: "コース", value: course.name, inline: false },
                       { name: "期限", value: due.toLocaleString("ja-JP"), inline: false },
                       { name: "提出状況", value: submitted ? "✅ 提出済み" : "❌ 未提出", inline: false },
+                      { name: "📝 AI要約", value: summary, inline: false },
                     ]
                   }]
                 }),
