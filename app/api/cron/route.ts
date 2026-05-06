@@ -1,5 +1,23 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+
+async function summarizeAssignment(title: string, description: string): Promise<string> {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const prompt = `以下の大学の課題内容を3行以内で簡潔に日本語で要約してください。課題名と説明文から何をすればいいか分かるように要約してください。
+
+課題名: ${title}
+説明: ${description || "説明なし"}`;
+
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  } catch {
+    return "要約を取得できませんでした";
+  }
+}
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -13,7 +31,6 @@ export async function GET(request: Request) {
   }
 
   for (const user of users) {
-    // ユーザー設定を取得（なければデフォルト60分）
     const { data: settings } = await supabase
       .from("user_settings")
       .select("reminder_minutes")
@@ -37,40 +54,22 @@ export async function GET(request: Request) {
       const assignments = workData.courseWork || [];
 
       for (const assignment of assignments) {
-        // 新着通知
-        const { data: existingNew } = await supabase
-          .from("notified_assignments")
-          .select("id")
-          .eq("assignment_id", assignment.id)
-          .eq("user_id", user.user_id)
-          .eq("notification_type", "new")
-          .single();
-
-        if (!existingNew) {
-          await fetch(process.env.DISCORD_WEBHOOK_URL!, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              embeds: [{
-                title: "📚 新しい課題が追加されました！",
-                color: 0x4285f4,
-                fields: [
-                  { name: "課題", value: assignment.title, inline: false },
-                  { name: "コース", value: course.name, inline: false },
-                  { name: "期限", value: assignment.dueDate ? new Date(assignment.dueDate.year, assignment.dueDate.month - 1, assignment.dueDate.day, assignment.dueTime?.hours || 23, assignment.dueTime?.minutes || 59).toLocaleString("ja-JP") : "期限なし", inline: false },
-                ]
-              }]
-            }),
-          });
-          await supabase.from("notified_assignments").insert({
-            assignment_id: assignment.id,
-            user_id: user.user_id,
-            notified_at: new Date().toISOString(),
-            notification_type: "new",
-          });
+        if (assignment.dueDate) {
+          const due = new Date(
+            assignment.dueDate.year,
+            assignment.dueDate.month - 1,
+            assignment.dueDate.day
+          );
+          const twoWeeksAgo = new Date();
+          twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+          if (due < twoWeeksAgo) continue;
+        } else {
+          const createdAt = new Date(assignment.creationTime);
+          const twoWeeksAgo = new Date();
+          twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+          if (createdAt < twoWeeksAgo) continue;
         }
 
-        // 提出状況を取得
         const subRes = await fetch(
           `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork/${assignment.id}/studentSubmissions`,
           { headers: { Authorization: `Bearer ${user.access_token}` } }
@@ -82,6 +81,46 @@ export async function GET(request: Request) {
           submissionState === "TURNED_IN" ||
           submissionState === "SUBMITTED" ||
           submissionState === "RETURNED";
+
+        if (submitted) continue;
+
+        const { data: existingNew } = await supabase
+          .from("notified_assignments")
+          .select("id")
+          .eq("assignment_id", assignment.id)
+          .eq("user_id", user.user_id)
+          .eq("notification_type", "new")
+          .single();
+
+        if (!existingNew) {
+          const summary = await summarizeAssignment(
+            assignment.title,
+            assignment.description || ""
+          );
+
+          await fetch(process.env.DISCORD_WEBHOOK_URL!, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              embeds: [{
+                title: "📚 新しい課題が追加されました！",
+                color: 0x4285f4,
+                fields: [
+                  { name: "課題", value: assignment.title, inline: false },
+                  { name: "コース", value: course.name, inline: false },
+                  { name: "期限", value: assignment.dueDate ? new Date(assignment.dueDate.year, assignment.dueDate.month - 1, assignment.dueDate.day, assignment.dueTime?.hours || 23, assignment.dueTime?.minutes || 59).toLocaleString("ja-JP") : "期限なし", inline: false },
+                  { name: "📝 AI要約", value: summary, inline: false },
+                ]
+              }]
+            }),
+          });
+          await supabase.from("notified_assignments").insert({
+            assignment_id: assignment.id,
+            user_id: user.user_id,
+            notified_at: new Date().toISOString(),
+            notification_type: "new",
+          });
+        }
 
         if (assignment.dueDate) {
           const due = new Date(
@@ -95,7 +134,6 @@ export async function GET(request: Request) {
           const hoursUntilDue = (due.getTime() - now.getTime()) / (1000 * 60 * 60);
           const minutesUntilDue = hoursUntilDue * 60;
 
-          // 期限前24時間通知
           if (hoursUntilDue > 0 && hoursUntilDue <= 24) {
             const { data: existing24h } = await supabase
               .from("notified_assignments")
@@ -106,6 +144,11 @@ export async function GET(request: Request) {
               .single();
 
             if (!existing24h) {
+              const summary = await summarizeAssignment(
+                assignment.title,
+                assignment.description || ""
+              );
+
               await fetch(process.env.DISCORD_WEBHOOK_URL!, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -117,7 +160,7 @@ export async function GET(request: Request) {
                       { name: "課題", value: assignment.title, inline: false },
                       { name: "コース", value: course.name, inline: false },
                       { name: "期限", value: due.toLocaleString("ja-JP"), inline: false },
-                      { name: "提出状況", value: submitted ? "✅ 提出済み" : "❌ 未提出", inline: false },
+                      { name: "📝 AI要約", value: summary, inline: false },
                     ]
                   }]
                 }),
@@ -131,8 +174,7 @@ export async function GET(request: Request) {
             }
           }
 
-          // 未提出確認通知（X分前・未提出のみ）
-          if (minutesUntilDue > 0 && minutesUntilDue <= reminderMinutes && !submitted) {
+          if (minutesUntilDue > 0 && minutesUntilDue <= reminderMinutes) {
             const { data: existingReminder } = await supabase
               .from("notified_assignments")
               .select("id")
