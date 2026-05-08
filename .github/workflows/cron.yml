@@ -1,0 +1,30 @@
+name: Classroom Notifier Cron
+
+on:
+  schedule:
+    - cron: '* * * * *'   # 1分ごと（期限通知用）
+    - cron: '0 0 * * 0'   # 毎週日曜0時（Classroom登録更新用）
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '* * * * *' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Trigger Cron Endpoint
+        run: |
+          curl -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -f \
+            https://classroom-notifier.vercel.app/api/cron
+
+  register:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 0 * * 0' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Trigger Register Endpoint
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -f \
+            https://classroom-notifier.vercel.app/api/classroom-register
