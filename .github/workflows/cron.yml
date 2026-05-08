@@ -1,0 +1,17 @@
+name: Classroom Notifier Cron
+
+on:
+  schedule:
+    - cron: '* * * * *'  # 1分ごと
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Cron Endpoint
+        run: |
+          curl -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -f \
+            https://classroom-notifier.vercel.app/api/cron
