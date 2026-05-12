@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { Client } from "@upstash/qstash";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const qstash = new Client({ token: process.env.QSTASH_TOKEN! });
 
 async function summarizeAssignment(title: string, description: string): Promise<string> {
   try {
@@ -31,7 +33,6 @@ export async function GET(request: Request) {
   }
 
   for (const user of users) {
-    // トークンリフレッシュ
     let accessToken = user.access_token;
     if (Date.now() / 1000 > user.expires_at - 300) {
       try {
@@ -142,98 +143,66 @@ export async function GET(request: Request) {
               }]
             }),
           });
+
           await supabase.from("notified_assignments").insert({
             assignment_id: assignment.id,
             user_id: user.user_id,
             notified_at: new Date().toISOString(),
             notification_type: "new",
           });
-        }
 
-        if (assignment.dueDate) {
-          const due = new Date(
-            assignment.dueDate.year,
-            assignment.dueDate.month - 1,
-            assignment.dueDate.day,
-            assignment.dueTime?.hours || 23,
-            assignment.dueTime?.minutes || 59
-          );
-          const now = new Date();
-          const hoursUntilDue = (due.getTime() - now.getTime()) / (1000 * 60 * 60);
-          const minutesUntilDue = hoursUntilDue * 60;
+          if (assignment.dueDate) {
+            const due = new Date(
+              assignment.dueDate.year,
+              assignment.dueDate.month - 1,
+              assignment.dueDate.day,
+              assignment.dueTime?.hours || 23,
+              assignment.dueTime?.minutes || 59
+            );
 
-          if (hoursUntilDue > 0 && hoursUntilDue <= 24) {
-            const { data: existing24h } = await supabase
-              .from("notified_assignments")
-              .select("id")
-              .eq("assignment_id", assignment.id)
-              .eq("user_id", user.user_id)
-              .eq("notification_type", "24h")
-              .single();
+            const notify24h = new Date(due.getTime() - 24 * 60 * 60 * 1000);
+            const notifyReminder = new Date(due.getTime() - reminderMinutes * 60 * 1000);
+            const now = new Date();
 
-            if (!existing24h) {
-              const summary = await summarizeAssignment(
-                assignment.title,
-                assignment.description || ""
-              );
-
-              await fetch(process.env.DISCORD_WEBHOOK_URL!, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  embeds: [{
-                    title: "⏰ 期限まで24時間を切りました！",
-                    color: 0xff6600,
-                    fields: [
-                      { name: "課題", value: assignment.title, inline: false },
-                      { name: "コース", value: course.name, inline: false },
-                      { name: "期限", value: due.toLocaleString("ja-JP"), inline: false },
-                      { name: "📝 AI要約", value: summary, inline: false },
-                    ]
-                  }]
-                }),
-              });
-              await supabase.from("notified_assignments").insert({
-                assignment_id: assignment.id,
-                user_id: user.user_id,
-                notified_at: new Date().toISOString(),
-                notification_type: "24h",
-              });
+            if (notify24h > now) {
+              try {
+                await qstash.publishJSON({
+                  url: `${process.env.NEXTAUTH_URL}/api/notify`,
+                  notBefore: Math.floor(notify24h.getTime() / 1000),
+                  body: {
+                    assignment_id: assignment.id,
+                    user_id: user.user_id,
+                    notification_type: "24h",
+                    assignment_title: assignment.title,
+                    course_name: course.name,
+                    due: due.toISOString(),
+                  },
+                });
+                console.log("QStash 24h registered:", assignment.id);
+              } catch (e) {
+                console.error("QStash 24h error:", e);
+              }
             }
-          }
 
-          if (minutesUntilDue > 0 && minutesUntilDue <= reminderMinutes) {
-            const { data: existingReminder } = await supabase
-              .from("notified_assignments")
-              .select("id")
-              .eq("assignment_id", assignment.id)
-              .eq("user_id", user.user_id)
-              .eq("notification_type", "reminder")
-              .single();
-
-            if (!existingReminder) {
-              await fetch(process.env.DISCORD_WEBHOOK_URL!, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  embeds: [{
-                    title: "🚨 期限まであと少し！まだ未提出です！",
-                    color: 0xff0000,
-                    fields: [
-                      { name: "課題", value: assignment.title, inline: false },
-                      { name: "コース", value: course.name, inline: false },
-                      { name: "期限", value: due.toLocaleString("ja-JP"), inline: false },
-                      { name: "残り時間", value: `約${Math.ceil(minutesUntilDue)}分`, inline: false },
-                    ]
-                  }]
-                }),
-              });
-              await supabase.from("notified_assignments").insert({
-                assignment_id: assignment.id,
-                user_id: user.user_id,
-                notified_at: new Date().toISOString(),
-                notification_type: "reminder",
-              });
+            if (notifyReminder > now) {
+              try {
+                await qstash.publishJSON({
+                  url: `${process.env.NEXTAUTH_URL}/api/notify`,
+                  notBefore: Math.floor(notifyReminder.getTime() / 1000),
+                  body: {
+                    assignment_id: assignment.id,
+                    user_id: user.user_id,
+                    notification_type: "reminder",
+                    assignment_title: assignment.title,
+                    course_name: course.name,
+                    due: due.toISOString(),
+                    reminder_minutes: reminderMinutes,
+                  },
+                });
+                console.log("QStash reminder registered:", assignment.id);
+              } catch (e) {
+                console.error("QStash reminder error:", e);
+              }
             }
           }
         }
