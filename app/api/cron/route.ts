@@ -31,6 +31,34 @@ export async function GET(request: Request) {
   }
 
   for (const user of users) {
+    // トークンリフレッシュ
+    let accessToken = user.access_token;
+    if (Date.now() / 1000 > user.expires_at - 300) {
+      try {
+        const res = await fetch("https://oauth2.googleapis.com/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_id: process.env.GOOGLE_CLIENT_ID!,
+            client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+            grant_type: "refresh_token",
+            refresh_token: user.refresh_token,
+          }),
+        });
+        const tokens = await res.json();
+        if (tokens.access_token) {
+          accessToken = tokens.access_token;
+          await supabase.from("user_tokens").update({
+            access_token: tokens.access_token,
+            expires_at: Math.floor(Date.now() / 1000 + tokens.expires_in),
+          }).eq("user_id", user.user_id);
+        }
+      } catch {
+        console.error("Token refresh failed for user:", user.user_id);
+        continue;
+      }
+    }
+
     const { data: settings } = await supabase
       .from("user_settings")
       .select("reminder_minutes")
@@ -40,7 +68,7 @@ export async function GET(request: Request) {
 
     const coursesRes = await fetch(
       "https://classroom.googleapis.com/v1/courses?courseStates=ACTIVE",
-      { headers: { Authorization: `Bearer ${user.access_token}` } }
+      { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     const coursesData = await coursesRes.json();
     const courses = coursesData.courses || [];
@@ -48,7 +76,7 @@ export async function GET(request: Request) {
     for (const course of courses) {
       const workRes = await fetch(
         `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork`,
-        { headers: { Authorization: `Bearer ${user.access_token}` } }
+        { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       const workData = await workRes.json();
       const assignments = workData.courseWork || [];
@@ -72,7 +100,7 @@ export async function GET(request: Request) {
 
         const subRes = await fetch(
           `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork/${assignment.id}/studentSubmissions`,
-          { headers: { Authorization: `Bearer ${user.access_token}` } }
+          { headers: { Authorization: `Bearer ${accessToken}` } }
         );
         const subData = await subRes.json();
         const submission = subData.studentSubmissions?.[0];
