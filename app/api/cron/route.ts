@@ -55,7 +55,6 @@ export async function GET(request: Request) {
           }).eq("user_id", user.user_id);
         }
       } catch {
-        console.error("Token refresh failed for user:", user.user_id);
         continue;
       }
     }
@@ -178,7 +177,6 @@ export async function GET(request: Request) {
                     due: due.toISOString(),
                   },
                 });
-                console.log("QStash 24h registered:", assignment.id);
               } catch (e) {
                 console.error("QStash 24h error:", e);
               }
@@ -199,7 +197,6 @@ export async function GET(request: Request) {
                     reminder_minutes: reminderMinutes,
                   },
                 });
-                console.log("QStash reminder registered:", assignment.id);
               } catch (e) {
                 console.error("QStash reminder error:", e);
               }
