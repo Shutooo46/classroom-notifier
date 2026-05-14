@@ -176,6 +176,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
         ) : (
           <>
             <p className="text-sm text-gray-500 mb-4">未提出リマインダー（期限の何時間・何分前に通知）</p>
+            <p className="text-xs text-gray-400 mb-4">※設定変更は新しく追加された課題から適用されます</p>
 
             <div className="flex items-center justify-center gap-4 mb-8 bg-gray-50 rounded-2xl py-4 px-6">
               <PickerColumn

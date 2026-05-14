@@ -136,7 +136,7 @@ export async function GET(request: Request) {
                 fields: [
                   { name: "課題", value: assignment.title, inline: false },
                   { name: "コース", value: course.name, inline: false },
-                  { name: "期限", value: assignment.dueDate ? new Date(assignment.dueDate.year, assignment.dueDate.month - 1, assignment.dueDate.day, assignment.dueTime?.hours || 23, assignment.dueTime?.minutes || 59).toLocaleString("ja-JP") : "期限なし", inline: false },
+                  { name: "期限", value: assignment.dueDate ? new Date(assignment.dueDate.year, assignment.dueDate.month - 1, assignment.dueDate.day, assignment.dueTime?.hours || 23, assignment.dueTime?.minutes || 59).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }) : "期限なし", inline: false },
                   { name: "📝 AI要約", value: summary, inline: false },
                 ]
               }]

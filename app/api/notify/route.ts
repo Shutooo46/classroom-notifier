@@ -40,7 +40,7 @@ async function handler(req: Request) {
           fields: [
             { name: "課題", value: assignment_title, inline: false },
             { name: "コース", value: course_name, inline: false },
-            { name: "期限", value: dueDate.toLocaleString("ja-JP"), inline: false },
+            { name: "期限", value: dueDate.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }), inline: false },
           ]
         }]
       }),
@@ -56,7 +56,7 @@ async function handler(req: Request) {
           fields: [
             { name: "課題", value: assignment_title, inline: false },
             { name: "コース", value: course_name, inline: false },
-            { name: "期限", value: dueDate.toLocaleString("ja-JP"), inline: false },
+            { name: "期限", value: dueDate.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }), inline: false },
             { name: "残り時間", value: `約${reminder_minutes}分`, inline: false },
           ]
         }]
