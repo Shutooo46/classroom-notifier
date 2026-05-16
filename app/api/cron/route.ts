@@ -136,7 +136,7 @@ export async function GET(request: Request) {
                 fields: [
                   { name: "課題", value: assignment.title, inline: false },
                   { name: "コース", value: course.name, inline: false },
-                  { name: "期限", value: assignment.dueDate ? new Date(assignment.dueDate.year, assignment.dueDate.month - 1, assignment.dueDate.day, assignment.dueTime?.hours || 23, assignment.dueTime?.minutes || 59).toLocaleString("ja-JP") : "期限なし", inline: false },
+                  { name: "期限", value: assignment.dueDate ? new Date(assignment.dueDate.year, assignment.dueDate.month - 1, assignment.dueDate.day, assignment.dueTime?.hours || 23, assignment.dueTime?.minutes || 59).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }) : "期限なし", inline: false },
                   { name: "📝 AI要約", value: summary, inline: false },
                 ]
               }]
@@ -180,6 +180,28 @@ export async function GET(request: Request) {
               } catch (e) {
                 console.error("QStash 24h error:", e);
               }
+            } else if (due > now) {
+              await fetch(process.env.DISCORD_WEBHOOK_URL!, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  embeds: [{
+                    title: "⏰ 期限まで24時間を切りました！",
+                    color: 0xff6600,
+                    fields: [
+                      { name: "課題", value: assignment.title, inline: false },
+                      { name: "コース", value: course.name, inline: false },
+                      { name: "期限", value: due.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }), inline: false },
+                    ]
+                  }]
+                }),
+              });
+              await supabase.from("notified_assignments").insert({
+                assignment_id: assignment.id,
+                user_id: user.user_id,
+                notified_at: new Date().toISOString(),
+                notification_type: "24h",
+              });
             }
 
             if (notifyReminder > now) {
@@ -200,6 +222,29 @@ export async function GET(request: Request) {
               } catch (e) {
                 console.error("QStash reminder error:", e);
               }
+            } else if (due > now) {
+              await fetch(process.env.DISCORD_WEBHOOK_URL!, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  embeds: [{
+                    title: "🚨 期限まであと少し！まだ未提出です！",
+                    color: 0xff0000,
+                    fields: [
+                      { name: "課題", value: assignment.title, inline: false },
+                      { name: "コース", value: course.name, inline: false },
+                      { name: "期限", value: due.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }), inline: false },
+                      { name: "残り時間", value: `約${Math.ceil((due.getTime() - now.getTime()) / (1000 * 60))}分`, inline: false },
+                    ]
+                  }]
+                }),
+              });
+              await supabase.from("notified_assignments").insert({
+                assignment_id: assignment.id,
+                user_id: user.user_id,
+                notified_at: new Date().toISOString(),
+                notification_type: "reminder",
+              });
             }
           }
         }
