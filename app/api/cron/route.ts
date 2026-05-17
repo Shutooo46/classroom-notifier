@@ -33,7 +33,7 @@ async function summarizeAssignment(
               },
             },
             {
-              text: `以下の大学の課題内容を3行以内で簡潔に日本語で要約してください。課題名と説明文、および添付PDFから何をすればいいか分かるように要約してください。
+              text: `添付PDFの内容を読んで、この課題で具体的に何をすればいいか教えてください。提出物の形式、評価基準、具体的な作業内容を含めて日本語で説明してください。
 
 課題名: ${title}
 説明: ${description || "説明なし"}`,
@@ -47,8 +47,7 @@ async function summarizeAssignment(
     }
 
     const result = await model.generateContent(
-      `以下の大学の課題内容を3行以内で簡潔に日本語で要約してください。課題名と説明文から何をすればいいか分かるように要約してください。
-
+      `以下の大学の課題内容を簡潔に日本語で要約してください。課題名と説明文から何をすればいいか分かるように要約してください。どのような課題か、回答者はなにをすればいいか、なにを提出すればいいかをわかりやすく要約してください。
 課題名: ${title}
 説明: ${description || "説明なし"}`
     );
@@ -158,10 +157,10 @@ export async function GET(request: Request) {
           .single();
 
         if (!existingNew) {
-          // PDFのDrive IDを取得
           const driveFileId = assignment.materials?.find(
             (m: any) => m.driveFile?.driveFile?.title?.endsWith(".pdf")
           )?.driveFile?.driveFile?.id;
+          console.log("assignment:", assignment.title, "driveFileId:", driveFileId);
 
           const summary = await summarizeAssignment(
             assignment.title,
@@ -224,6 +223,28 @@ export async function GET(request: Request) {
               } catch (e) {
                 console.error("QStash 24h error:", e);
               }
+            } else if (due > now) {
+              await fetch(process.env.DISCORD_WEBHOOK_URL!, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  embeds: [{
+                    title: "⏰ 期限まで24時間を切りました！",
+                    color: 0xff6600,
+                    fields: [
+                      { name: "課題", value: assignment.title, inline: false },
+                      { name: "コース", value: course.name, inline: false },
+                      { name: "期限", value: due.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }), inline: false },
+                    ]
+                  }]
+                }),
+              });
+              await supabase.from("notified_assignments").insert({
+                assignment_id: assignment.id,
+                user_id: user.user_id,
+                notified_at: new Date().toISOString(),
+                notification_type: "24h",
+              });
             }
 
             if (notifyReminder > now) {
@@ -244,6 +265,29 @@ export async function GET(request: Request) {
               } catch (e) {
                 console.error("QStash reminder error:", e);
               }
+            } else if (due > now) {
+              await fetch(process.env.DISCORD_WEBHOOK_URL!, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  embeds: [{
+                    title: "🚨 期限まであと少し！まだ未提出です！",
+                    color: 0xff0000,
+                    fields: [
+                      { name: "課題", value: assignment.title, inline: false },
+                      { name: "コース", value: course.name, inline: false },
+                      { name: "期限", value: due.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }), inline: false },
+                      { name: "残り時間", value: `約${Math.ceil((due.getTime() - now.getTime()) / (1000 * 60))}分`, inline: false },
+                    ]
+                  }]
+                }),
+              });
+              await supabase.from("notified_assignments").insert({
+                assignment_id: assignment.id,
+                user_id: user.user_id,
+                notified_at: new Date().toISOString(),
+                notification_type: "reminder",
+              });
             }
           }
         }

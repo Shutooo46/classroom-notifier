@@ -223,16 +223,18 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
-    if (session) {
-      setLoading(true);
-      fetch("/api/classroom")
-        .then((res) => res.json())
-        .then((d) => {
+  if (session) {
+    setLoading(true);
+    fetch("/api/classroom")
+      .then((res) => res.json())
+      .then((d) => {
+        if (d.noDue) {
           setData(d);
-          setLoading(false);
-        });
-    }
-  }, [session]);
+        }
+        setLoading(false);
+      });
+  }
+}, [session]);
 
   if (!session) {
     return (
