@@ -37,7 +37,6 @@ export async function GET() {
   { headers: { Authorization: `Bearer ${accessToken}` } }
 );
 const subData = await subRes.json();
-//console.log("提出状況:", JSON.stringify(subData.studentSubmissions?.[0]));
 const submissions = subData.studentSubmissions || [];
 const submission = submissions[0];
 const submissionState = submission?.state || "NEW";
@@ -95,8 +94,12 @@ else later.push(a);
       }
     });
 
-    return NextResponse.json({ noDue, thisWeek, nextWeek, later });
+return NextResponse.json(
+  { noDue, thisWeek, nextWeek, later },
+  { headers: { "Cache-Control": "no-store" } }
+);
   } catch (error) {
-    return NextResponse.json({ error: "取得失敗" }, { status: 500 });
+    return NextResponse.json({ error: "取得失敗" }, { status: 500, headers: { "Cache-Control": "no-store" } });
+
   }
 }
