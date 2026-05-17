@@ -6,15 +6,52 @@ import { Client } from "@upstash/qstash";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 const qstash = new Client({ token: process.env.QSTASH_TOKEN! });
 
-async function summarizeAssignment(title: string, description: string): Promise<string> {
+async function summarizeAssignment(
+  title: string,
+  description: string,
+  driveFileId?: string,
+  accessToken?: string
+): Promise<string> {
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-    const prompt = `以下の大学の課題内容を3行以内で簡潔に日本語で要約してください。課題名と説明文から何をすればいいか分かるように要約してください。
+
+    if (driveFileId && accessToken) {
+      try {
+        const driveRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (driveRes.ok) {
+          const arrayBuffer = await driveRes.arrayBuffer();
+          const base64 = Buffer.from(arrayBuffer).toString("base64");
+
+          const result = await model.generateContent([
+            {
+              inlineData: {
+                mimeType: "application/pdf",
+                data: base64,
+              },
+            },
+            {
+              text: `以下の大学の課題内容を3行以内で簡潔に日本語で要約してください。課題名と説明文、および添付PDFから何をすればいいか分かるように要約してください。
 
 課題名: ${title}
-説明: ${description || "説明なし"}`;
+説明: ${description || "説明なし"}`,
+            },
+          ]);
+          return result.response.text();
+        }
+      } catch (e) {
+        console.error("Drive API error:", e);
+      }
+    }
 
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent(
+      `以下の大学の課題内容を3行以内で簡潔に日本語で要約してください。課題名と説明文から何をすればいいか分かるように要約してください。
+
+課題名: ${title}
+説明: ${description || "説明なし"}`
+    );
     return result.response.text();
   } catch {
     return "要約を取得できませんでした";
@@ -121,9 +158,16 @@ export async function GET(request: Request) {
           .single();
 
         if (!existingNew) {
+          // PDFのDrive IDを取得
+          const driveFileId = assignment.materials?.find(
+            (m: any) => m.driveFile?.driveFile?.title?.endsWith(".pdf")
+          )?.driveFile?.driveFile?.id;
+
           const summary = await summarizeAssignment(
             assignment.title,
-            assignment.description || ""
+            assignment.description || "",
+            driveFileId,
+            accessToken
           );
 
           await fetch(process.env.DISCORD_WEBHOOK_URL!, {
