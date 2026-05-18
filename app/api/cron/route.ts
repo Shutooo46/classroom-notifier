@@ -9,45 +9,12 @@ const qstash = new Client({ token: process.env.QSTASH_TOKEN! });
 async function summarizeAssignment(
   title: string,
   description: string,
-  driveFileId?: string,
-  accessToken?: string
 ): Promise<string> {
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-    if (driveFileId && accessToken) {
-      try {
-        const driveRes = await fetch(
-          `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-        if (driveRes.ok) {
-          const arrayBuffer = await driveRes.arrayBuffer();
-          const base64 = Buffer.from(arrayBuffer).toString("base64");
-
-          const result = await model.generateContent([
-            {
-              inlineData: {
-                mimeType: "application/pdf",
-                data: base64,
-              },
-            },
-            {
-              text: `添付PDFの内容を読んで、この課題で具体的に何をすればいいか教えてください。提出物の形式、評価基準、具体的な作業内容を含めて日本語で説明してください。
-
-課題名: ${title}
-説明: ${description || "説明なし"}`,
-            },
-          ]);
-          return result.response.text();
-        }
-      } catch (e) {
-        console.error("Drive API error:", e);
-      }
-    }
-
     const result = await model.generateContent(
-      `以下の大学の課題内容を簡潔に日本語で要約してください。課題名と説明文から何をすればいいか分かるように要約してください。どのような課題か、回答者はなにをすればいいか、なにを提出すればいいかをわかりやすく要約してください。
+      `以下の大学の課題内容を3行以内で簡潔に日本語で要約してください。課題名と説明文から何をすればいいか分かるように要約してください。
+
 課題名: ${title}
 説明: ${description || "説明なし"}`
     );
@@ -63,22 +30,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-   console.log("DISCORD_WEBHOOK_URL exists:", !!process.env.DISCORD_WEBHOOK_URL);
-
   const { data: users } = await supabase.from("user_tokens").select("*");
-  console.log("users count:", users?.length ?? 0);
-
   if (!users || users.length === 0) {
     return NextResponse.json({ message: "No users found" });
   }
 
-for (const user of users) {
-  console.log("processing user:", user.user_id);
-  console.log("access_token exists:", !!user.access_token);
-  console.log("refresh_token exists:", !!user.refresh_token);
-  let accessToken = user.access_token;
-  if (Date.now() / 1000 > user.expires_at - 300) {
-    console.log("token needs refresh");
+  for (const user of users) {
+    let accessToken = user.access_token;
+    if (Date.now() / 1000 > user.expires_at - 300) {
       try {
         const res = await fetch("https://oauth2.googleapis.com/token", {
           method: "POST",
@@ -127,11 +86,11 @@ for (const user of users) {
 
       for (const assignment of assignments) {
         if (assignment.dueDate) {
-          const due = new Date(
+          const due = new Date(Date.UTC(
             assignment.dueDate.year,
             assignment.dueDate.month - 1,
             assignment.dueDate.day
-          );
+          ));
           const twoWeeksAgo = new Date();
           twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
           if (due < twoWeeksAgo) continue;
@@ -165,17 +124,18 @@ for (const user of users) {
           .single();
 
         if (!existingNew) {
-          const driveFileId = assignment.materials?.find(
-            (m: any) => m.driveFile?.driveFile?.title?.endsWith(".pdf")
-          )?.driveFile?.driveFile?.id;
-          console.log("assignment:", assignment.title, "driveFileId:", driveFileId);
-
           const summary = await summarizeAssignment(
             assignment.title,
             assignment.description || "",
-            driveFileId,
-            accessToken
           );
+
+          const due = new Date(Date.UTC(
+            assignment.dueDate?.year ?? new Date().getFullYear(),
+            (assignment.dueDate?.month ?? new Date().getMonth() + 1) - 1,
+            assignment.dueDate?.day ?? new Date().getDate(),
+            assignment.dueTime?.hours ?? 23,
+            assignment.dueTime?.minutes ?? 59
+          ));
 
           await fetch(process.env.DISCORD_WEBHOOK_URL!, {
             method: "POST",
@@ -187,7 +147,7 @@ for (const user of users) {
                 fields: [
                   { name: "課題", value: assignment.title, inline: false },
                   { name: "コース", value: course.name, inline: false },
-                  { name: "期限", value: assignment.dueDate ? new Date(assignment.dueDate.year, assignment.dueDate.month - 1, assignment.dueDate.day, assignment.dueTime?.hours || 23, assignment.dueTime?.minutes || 59).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }) : "期限なし", inline: false },
+                  { name: "期限", value: assignment.dueDate ? due.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }) : "期限なし", inline: false },
                   { name: "📝 AI要約", value: summary, inline: false },
                 ]
               }]
@@ -202,19 +162,12 @@ for (const user of users) {
           });
 
           if (assignment.dueDate) {
-            const due = new Date(
-              assignment.dueDate.year,
-              assignment.dueDate.month - 1,
-              assignment.dueDate.day,
-              assignment.dueTime?.hours || 23,
-              assignment.dueTime?.minutes || 59
-            );
-
             const notify24h = new Date(due.getTime() - 24 * 60 * 60 * 1000);
             const notifyReminder = new Date(due.getTime() - reminderMinutes * 60 * 1000);
             const now = new Date();
+            const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-            if (notify24h > now) {
+            if (notify24h > now && notify24h < sevenDaysLater) {
               try {
                 await qstash.publishJSON({
                   url: `${process.env.NEXTAUTH_URL}/api/notify`,
@@ -231,7 +184,7 @@ for (const user of users) {
               } catch (e) {
                 console.error("QStash 24h error:", e);
               }
-            } else if (due > now) {
+            } else if (due > now && notify24h <= now) {
               await fetch(process.env.DISCORD_WEBHOOK_URL!, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -255,7 +208,7 @@ for (const user of users) {
               });
             }
 
-            if (notifyReminder > now) {
+            if (notifyReminder > now && notifyReminder < sevenDaysLater) {
               try {
                 await qstash.publishJSON({
                   url: `${process.env.NEXTAUTH_URL}/api/notify`,
@@ -273,7 +226,7 @@ for (const user of users) {
               } catch (e) {
                 console.error("QStash reminder error:", e);
               }
-            } else if (due > now) {
+            } else if (due > now && notifyReminder <= now) {
               await fetch(process.env.DISCORD_WEBHOOK_URL!, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
