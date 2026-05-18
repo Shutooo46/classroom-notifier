@@ -72,9 +72,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: "No users found" });
   }
 
-  for (const user of users) {
-    let accessToken = user.access_token;
-    if (Date.now() / 1000 > user.expires_at - 300) {
+for (const user of users) {
+  console.log("processing user:", user.user_id);
+  console.log("access_token exists:", !!user.access_token);
+  console.log("refresh_token exists:", !!user.refresh_token);
+  let accessToken = user.access_token;
+  if (Date.now() / 1000 > user.expires_at - 300) {
+    console.log("token needs refresh");
       try {
         const res = await fetch("https://oauth2.googleapis.com/token", {
           method: "POST",
