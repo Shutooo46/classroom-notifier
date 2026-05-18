@@ -66,6 +66,8 @@ export async function GET(request: Request) {
    console.log("DISCORD_WEBHOOK_URL exists:", !!process.env.DISCORD_WEBHOOK_URL);
 
   const { data: users } = await supabase.from("user_tokens").select("*");
+  console.log("users count:", users?.length ?? 0);
+
   if (!users || users.length === 0) {
     return NextResponse.json({ message: "No users found" });
   }
