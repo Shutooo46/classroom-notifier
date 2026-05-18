@@ -63,6 +63,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+   console.log("DISCORD_WEBHOOK_URL exists:", !!process.env.DISCORD_WEBHOOK_URL);
+
   const { data: users } = await supabase.from("user_tokens").select("*");
   if (!users || users.length === 0) {
     return NextResponse.json({ message: "No users found" });
