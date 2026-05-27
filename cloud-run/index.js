@@ -41,17 +41,78 @@ async function processQueue() {
   isProcessing = false;
 }
 
-async function callGeminiWithRetry(title, description, retries = 3) {
+const GOOGLE_NATIVE_EXPORTABLE = {
+  "application/vnd.google-apps.document": true,
+  "application/vnd.google-apps.presentation": true,
+  "application/vnd.google-apps.spreadsheet": true,
+  "application/vnd.google-apps.drawing": true,
+};
+
+async function fetchDriveFile(fileId, accessToken) {
+  try {
+    const metaRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=mimeType,exportLinks`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (!metaRes.ok) return null;
+    const { mimeType, exportLinks } = await metaRes.json();
+
+    let downloadUrl;
+    let targetMimeType;
+
+    if (GOOGLE_NATIVE_EXPORTABLE[mimeType]) {
+      const exportUrl = exportLinks?.["application/pdf"];
+      if (!exportUrl) return null;
+      downloadUrl = exportUrl;
+      targetMimeType = "application/pdf";
+    } else if (mimeType === "application/pdf") {
+      downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+      targetMimeType = "application/pdf";
+    } else if (
+      mimeType === "text/plain" ||
+      mimeType === "text/html" ||
+      mimeType === "text/csv" ||
+      mimeType === "text/xml" ||
+      mimeType === "text/rtf" ||
+      mimeType === "application/rtf"
+    ) {
+      downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+      targetMimeType = "text/plain";
+    } else {
+      return null;
+    }
+
+    const response = await fetch(downloadUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!response.ok) return null;
+
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength > 20 * 1024 * 1024) {
+      console.log(`Drive file ${fileId} is too large (${buffer.byteLength} bytes), skipping`);
+      return null;
+    }
+
+    return { mimeType: targetMimeType, data: Buffer.from(buffer).toString("base64") };
+  } catch (e) {
+    console.error(`Drive file fetch error for ${fileId}:`, e);
+    return null;
+  }
+}
+
+async function callGeminiWithRetry(title, description, fileParts = [], retries = 3) {
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+  const prompt = `以下の大学の課題内容を3行以内で簡潔に日本語で要約してください。課題名と説明文から何をすればいいか分かるように要約してください。${fileParts.length > 0 ? "添付ファイルの内容も参考にして要約してください。" : ""}
+
+課題名: ${title}
+説明: ${description || "説明なし"}`;
+
+  const contents = [prompt, ...fileParts];
 
   for (let i = 0; i < retries; i++) {
     try {
-      const result = await model.generateContent(
-        `以下の大学の課題内容を3行以内で簡潔に日本語で要約してください。課題名と説明文から何をすればいいか分かるように要約してください。
-
-課題名: ${title}
-説明: ${description || "説明なし"}`
-      );
+      const result = await model.generateContent(contents);
       return result.response.text();
     } catch (e) {
       const is429 = e?.status === 429 || String(e).includes("429");
@@ -66,10 +127,20 @@ async function callGeminiWithRetry(title, description, retries = 3) {
   }
 }
 
-async function summarizeAssignment(title, description) {
+async function summarizeAssignment(title, description, driveFileIds = [], accessToken = "") {
   try {
+    const fileParts = [];
+    if (driveFileIds.length > 0 && accessToken) {
+      for (const fileId of driveFileIds) {
+        const file = await fetchDriveFile(fileId, accessToken);
+        if (file) {
+          fileParts.push({ inlineData: { mimeType: file.mimeType, data: file.data } });
+        }
+      }
+    }
+
     const text = await enqueueGeminiRequest(() =>
-      callGeminiWithRetry(title, description)
+      callGeminiWithRetry(title, description, fileParts)
     );
     return text;
   } catch (e) {
@@ -79,12 +150,14 @@ async function summarizeAssignment(title, description) {
 }
 
 app.post("/process", async (req, res) => {
-  const { assignment, course, user_id, reminderMinutes, accessToken } = req.body;
+  const { assignment, course, user_id, reminderMinutes, accessToken, driveFileIds } = req.body;
 
   try {
     const summary = await summarizeAssignment(
       assignment.title,
-      assignment.description || ""
+      assignment.description || "",
+      driveFileIds || [],
+      accessToken || ""
     );
 
     const due = new Date(Date.UTC(

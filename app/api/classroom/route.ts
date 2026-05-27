@@ -44,11 +44,21 @@ const submitted =
   submissionState === "TURNED_IN" ||
   submissionState === "SUBMITTED" ||
   submissionState === "RETURNED";
+            const driveFileIds: string[] = [];
+            if (work.materials) {
+              for (const material of work.materials) {
+                if (material.driveFile?.driveFile?.id) {
+                  driveFileIds.push(material.driveFile.driveFile.id);
+                }
+              }
+            }
+
             allAssignments.push({
               ...work,
               courseName: course.name,
               submitted,
               submissionState,
+              driveFileIds,
             });
           })
         );
