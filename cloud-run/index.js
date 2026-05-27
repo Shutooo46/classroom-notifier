@@ -41,17 +41,43 @@ async function processQueue() {
   isProcessing = false;
 }
 
-async function callGeminiWithRetry(title, description, retries = 3) {
+async function fetchDrivePDF(fileId, accessToken) {
+  try {
+    const response = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (!response.ok) return null;
+
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("application/pdf")) return null;
+
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength > 20 * 1024 * 1024) {
+      console.log(`Drive file ${fileId} is too large (${buffer.byteLength} bytes), skipping`);
+      return null;
+    }
+
+    return Buffer.from(buffer).toString("base64");
+  } catch (e) {
+    console.error(`Drive file fetch error for ${fileId}:`, e);
+    return null;
+  }
+}
+
+async function callGeminiWithRetry(title, description, pdfParts = [], retries = 3) {
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+  const prompt = `以下の大学の課題内容を3行以内で簡潔に日本語で要約してください。課題名と説明文から何をすればいいか分かるように要約してください。${pdfParts.length > 0 ? "添付PDFの内容も参考にして要約してください。" : ""}
+
+課題名: ${title}
+説明: ${description || "説明なし"}`;
+
+  const contents = [prompt, ...pdfParts];
 
   for (let i = 0; i < retries; i++) {
     try {
-      const result = await model.generateContent(
-        `以下の大学の課題内容を3行以内で簡潔に日本語で要約してください。課題名と説明文から何をすればいいか分かるように要約してください。
-
-課題名: ${title}
-説明: ${description || "説明なし"}`
-      );
+      const result = await model.generateContent(contents);
       return result.response.text();
     } catch (e) {
       const is429 = e?.status === 429 || String(e).includes("429");
@@ -66,10 +92,20 @@ async function callGeminiWithRetry(title, description, retries = 3) {
   }
 }
 
-async function summarizeAssignment(title, description) {
+async function summarizeAssignment(title, description, driveFileIds = [], accessToken = "") {
   try {
+    const pdfParts = [];
+    if (driveFileIds.length > 0 && accessToken) {
+      for (const fileId of driveFileIds) {
+        const pdfBase64 = await fetchDrivePDF(fileId, accessToken);
+        if (pdfBase64) {
+          pdfParts.push({ inlineData: { mimeType: "application/pdf", data: pdfBase64 } });
+        }
+      }
+    }
+
     const text = await enqueueGeminiRequest(() =>
-      callGeminiWithRetry(title, description)
+      callGeminiWithRetry(title, description, pdfParts)
     );
     return text;
   } catch (e) {
@@ -79,12 +115,14 @@ async function summarizeAssignment(title, description) {
 }
 
 app.post("/process", async (req, res) => {
-  const { assignment, course, user_id, reminderMinutes, accessToken } = req.body;
+  const { assignment, course, user_id, reminderMinutes, accessToken, driveFileIds } = req.body;
 
   try {
     const summary = await summarizeAssignment(
       assignment.title,
-      assignment.description || ""
+      assignment.description || "",
+      driveFileIds || [],
+      accessToken || ""
     );
 
     const due = new Date(Date.UTC(

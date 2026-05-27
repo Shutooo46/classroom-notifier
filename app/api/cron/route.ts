@@ -109,6 +109,15 @@ export async function GET(request: Request) {
             notification_type: "new",
           });
 
+          const driveFileIds: string[] = [];
+          if (assignment.materials) {
+            for (const material of assignment.materials) {
+              if (material.driveFile?.driveFile?.id) {
+                driveFileIds.push(material.driveFile.driveFile.id);
+              }
+            }
+          }
+
           // Cloud Runに処理を投げる（非同期・待たない）
           fetch(`${process.env.CLOUD_RUN_URL}/process`, {
             method: "POST",
@@ -119,6 +128,7 @@ export async function GET(request: Request) {
               user_id: user.user_id,
               reminderMinutes,
               accessToken,
+              driveFileIds,
             }),
           }).catch((e) => console.error("Cloud Run error:", e));
         }
