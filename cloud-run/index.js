@@ -8,17 +8,72 @@ app.use(express.json());
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const qstash = new Client({ token: process.env.QSTASH_TOKEN });
 
-async function summarizeAssignment(title, description) {
-  try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-    const result = await model.generateContent(
-      `以下の大学の課題内容を3行以内で簡潔に日本語で要約してください。課題名と説明文から何をすればいいか分かるように要約してください。
+
+let isProcessing = false;
+const requestQueue = [];
+
+function enqueueGeminiRequest(fn) {
+  return new Promise((resolve, reject) => {
+    requestQueue.push({ fn, resolve, reject });
+    processQueue();
+  });
+}
+
+async function processQueue() {
+
+  if (isProcessing) return;
+  isProcessing = true;
+
+  while (requestQueue.length > 0) {
+    const { fn, resolve, reject } = requestQueue.shift();
+    try {
+      const result = await fn();
+      resolve(result);
+    } catch (e) {
+      reject(e);
+    }
+
+    if (requestQueue.length > 0) {
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+
+  isProcessing = false;
+}
+
+async function callGeminiWithRetry(title, description, retries = 3) {
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+  for (let i = 0; i < retries; i++) {
+    try {
+      const result = await model.generateContent(
+        `以下の大学の課題内容を3行以内で簡潔に日本語で要約してください。課題名と説明文から何をすればいいか分かるように要約してください。
 
 課題名: ${title}
 説明: ${description || "説明なし"}`
+      );
+      return result.response.text();
+    } catch (e) {
+      const is429 = e?.status === 429 || String(e).includes("429");
+      if (is429 && i < retries - 1) {
+        const wait = 15000 * (i + 1);
+        console.log(`429エラー: ${wait / 1000}秒後にリトライ (${i + 1}/${retries - 1}回目)`);
+        await new Promise((r) => setTimeout(r, wait));
+      } else {
+        throw e;
+      }
+    }
+  }
+}
+
+async function summarizeAssignment(title, description) {
+  try {
+    const text = await enqueueGeminiRequest(() =>
+      callGeminiWithRetry(title, description)
     );
-    return result.response.text();
-  } catch {
+    return text;
+  } catch (e) {
+    console.error("Gemini error:", e);
     return "要約を取得できませんでした";
   }
 }
