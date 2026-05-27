@@ -14,11 +14,14 @@ export async function GET() {
 
   const { data } = await supabase
     .from("user_settings")
-    .select("reminder_minutes")
+    .select("reminder_minutes, course_settings")
     .eq("user_id", userId)
     .single();
 
-  return NextResponse.json({ reminder_minutes: data?.reminder_minutes ?? 60 });
+  return NextResponse.json({
+    reminder_minutes: data?.reminder_minutes ?? 60,
+    course_settings: data?.course_settings ?? {},
+  });
 }
 
 export async function POST(request: Request) {
@@ -28,11 +31,15 @@ export async function POST(request: Request) {
   }
 
   const userId = (session as any).userId;
-  const { reminder_minutes } = await request.json();
+  const { reminder_minutes, course_settings } = await request.json();
+
+  const updateData: Record<string, any> = { user_id: userId };
+  if (reminder_minutes !== undefined) updateData.reminder_minutes = reminder_minutes;
+  if (course_settings !== undefined) updateData.course_settings = course_settings;
 
   await supabase
     .from("user_settings")
-    .upsert({ user_id: userId, reminder_minutes }, { onConflict: "user_id" });
+    .upsert(updateData, { onConflict: "user_id" });
 
   return NextResponse.json({ success: true });
 }

@@ -55,6 +55,7 @@ const submitted =
 
             allAssignments.push({
               ...work,
+              courseId: course.id,
               courseName: course.name,
               submitted,
               submissionState,
@@ -105,7 +106,10 @@ else later.push(a);
     });
 
 return NextResponse.json(
-  { noDue, thisWeek, nextWeek, later },
+  {
+    courses: courses.map((c: any) => ({ id: c.id, name: c.name })),
+    noDue, thisWeek, nextWeek, later,
+  },
   { headers: { "Cache-Control": "no-store" } }
 );
   } catch (error) {
