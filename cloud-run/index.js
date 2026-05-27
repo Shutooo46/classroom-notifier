@@ -41,16 +41,41 @@ async function processQueue() {
   isProcessing = false;
 }
 
-async function fetchDrivePDF(fileId, accessToken) {
+const GOOGLE_NATIVE_EXPORTABLE = {
+  "application/vnd.google-apps.document": true,
+  "application/vnd.google-apps.presentation": true,
+  "application/vnd.google-apps.spreadsheet": true,
+  "application/vnd.google-apps.drawing": true,
+};
+
+async function fetchDriveFile(fileId, accessToken) {
   try {
-    const response = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+    const metaRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=mimeType,exportLinks`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
-    if (!response.ok) return null;
+    if (!metaRes.ok) return null;
+    const { mimeType, exportLinks } = await metaRes.json();
 
-    const contentType = response.headers.get("content-type") || "";
-    if (!contentType.includes("application/pdf")) return null;
+    let downloadUrl;
+    let targetMimeType;
+
+    if (GOOGLE_NATIVE_EXPORTABLE[mimeType]) {
+      const exportUrl = exportLinks?.["application/pdf"];
+      if (!exportUrl) return null;
+      downloadUrl = exportUrl;
+      targetMimeType = "application/pdf";
+    } else if (mimeType === "application/pdf") {
+      downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+      targetMimeType = "application/pdf";
+    } else {
+      return null;
+    }
+
+    const response = await fetch(downloadUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!response.ok) return null;
 
     const buffer = await response.arrayBuffer();
     if (buffer.byteLength > 20 * 1024 * 1024) {
@@ -58,22 +83,22 @@ async function fetchDrivePDF(fileId, accessToken) {
       return null;
     }
 
-    return Buffer.from(buffer).toString("base64");
+    return { mimeType: targetMimeType, data: Buffer.from(buffer).toString("base64") };
   } catch (e) {
     console.error(`Drive file fetch error for ${fileId}:`, e);
     return null;
   }
 }
 
-async function callGeminiWithRetry(title, description, pdfParts = [], retries = 3) {
+async function callGeminiWithRetry(title, description, fileParts = [], retries = 3) {
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-  const prompt = `以下の大学の課題内容を3行以内で簡潔に日本語で要約してください。課題名と説明文から何をすればいいか分かるように要約してください。${pdfParts.length > 0 ? "添付PDFの内容も参考にして要約してください。" : ""}
+  const prompt = `以下の大学の課題内容を3行以内で簡潔に日本語で要約してください。課題名と説明文から何をすればいいか分かるように要約してください。${fileParts.length > 0 ? "添付ファイルの内容も参考にして要約してください。" : ""}
 
 課題名: ${title}
 説明: ${description || "説明なし"}`;
 
-  const contents = [prompt, ...pdfParts];
+  const contents = [prompt, ...fileParts];
 
   for (let i = 0; i < retries; i++) {
     try {
@@ -94,18 +119,18 @@ async function callGeminiWithRetry(title, description, pdfParts = [], retries = 
 
 async function summarizeAssignment(title, description, driveFileIds = [], accessToken = "") {
   try {
-    const pdfParts = [];
+    const fileParts = [];
     if (driveFileIds.length > 0 && accessToken) {
       for (const fileId of driveFileIds) {
-        const pdfBase64 = await fetchDrivePDF(fileId, accessToken);
-        if (pdfBase64) {
-          pdfParts.push({ inlineData: { mimeType: "application/pdf", data: pdfBase64 } });
+        const file = await fetchDriveFile(fileId, accessToken);
+        if (file) {
+          fileParts.push({ inlineData: { mimeType: file.mimeType, data: file.data } });
         }
       }
     }
 
     const text = await enqueueGeminiRequest(() =>
-      callGeminiWithRetry(title, description, pdfParts)
+      callGeminiWithRetry(title, description, fileParts)
     );
     return text;
   } catch (e) {
