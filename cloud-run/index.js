@@ -68,6 +68,16 @@ async function fetchDriveFile(fileId, accessToken) {
     } else if (mimeType === "application/pdf") {
       downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
       targetMimeType = "application/pdf";
+    } else if (
+      mimeType === "text/plain" ||
+      mimeType === "text/html" ||
+      mimeType === "text/csv" ||
+      mimeType === "text/xml" ||
+      mimeType === "text/rtf" ||
+      mimeType === "application/rtf"
+    ) {
+      downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+      targetMimeType = "text/plain";
     } else {
       return null;
     }
