@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession, signIn, signOut } from "next-auth/react";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 
 type Assignment = {
   id: string;
@@ -18,6 +18,7 @@ type Assignment = {
 type Course = {
   id: string;
   name: string;
+  creationTime?: string;
 };
 
 type ClassroomData = {
@@ -29,7 +30,13 @@ type ClassroomData = {
 };
 
 type CourseSettings = {
-  [courseId: string]: { notify: boolean };
+  [courseId: string]: { notify: boolean; hidden?: boolean };
+};
+
+type UserSettings = {
+  reminder_minutes: number;
+  course_settings: CourseSettings;
+  per_course_notify: boolean;
 };
 
 function Toggle({ enabled, onChange }: { enabled: boolean; onChange: () => void }) {
@@ -105,22 +112,120 @@ function Section({ title, assignments, defaultOpen = true }: { title: string; as
   );
 }
 
-function CourseCard({ course, pendingCount, onOpen }: { course: Course; pendingCount: number; onOpen: () => void }) {
+function HideConfirmDialog({ courseName, onConfirm, onCancel }: {
+  courseName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
   return (
-    <div
-      className="border rounded-xl p-4 mb-3 bg-white border-gray-200 cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors"
-      onClick={onOpen}
-    >
+    <div style={{ backgroundColor: "rgba(0,0,0,0.4)" }} className="fixed inset-0 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl w-80 shadow-2xl p-6">
+        <h3 className="text-base font-bold text-gray-800 mb-2">授業を非表示にする</h3>
+        <p className="text-sm text-gray-500 mb-5">
+          「{courseName}」を非表示にしますか？<br />
+          詳細設定の「非表示の授業」から再表示できます。
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 border border-gray-300 text-gray-600 py-2.5 rounded-xl text-sm hover:bg-gray-50"
+          >
+            キャンセル
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 bg-red-500 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-red-600"
+          >
+            非表示にする
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CourseCard({
+  course,
+  pendingCount,
+  onOpen,
+  perCourseNotify,
+  notifyEnabled,
+  onToggleNotify,
+  onHide,
+}: {
+  course: Course;
+  pendingCount: number;
+  onOpen: () => void;
+  perCourseNotify: boolean;
+  notifyEnabled: boolean;
+  onToggleNotify: () => void;
+  onHide: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    if (menuOpen) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
+
+  return (
+    <div className="border rounded-xl p-4 mb-3 bg-white border-gray-200 transition-colors">
       <div className="flex items-center justify-between">
-        <div className="flex-1 min-w-0">
+        <div
+          className="flex-1 min-w-0 cursor-pointer"
+          onClick={onOpen}
+        >
           <p className="font-medium text-gray-800 truncate">{course.name}</p>
           <p className={`text-sm mt-0.5 ${pendingCount > 0 ? "text-blue-500" : "text-gray-400"}`}>
             {pendingCount > 0 ? `未提出 ${pendingCount} 件` : "未提出なし"}
           </p>
         </div>
-        <svg className="w-5 h-5 text-gray-300 flex-shrink-0 ml-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
+        <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+          {perCourseNotify && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleNotify(); }}
+              className={`p-1.5 rounded-lg transition-colors ${notifyEnabled ? "text-blue-500 hover:bg-blue-50" : "text-gray-300 hover:bg-gray-100"}`}
+              title={notifyEnabled ? "通知オン" : "通知オフ"}
+            >
+              <svg className="w-5 h-5" fill={notifyEnabled ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+            </button>
+          )}
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" />
+              </svg>
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-8 w-36 bg-white border border-gray-200 rounded-xl shadow-lg z-10 py-1">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onHide(); }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50"
+                >
+                  非表示にする
+                </button>
+              </div>
+            )}
+          </div>
+          <svg
+            className="w-5 h-5 text-gray-300 cursor-pointer"
+            fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            onClick={onOpen}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
       </div>
     </div>
   );
@@ -178,45 +283,37 @@ function PickerColumn({ values, selected, onChange, label }: {
   );
 }
 
-function SettingsModal({ onClose, courses }: { onClose: () => void; courses: Course[] }) {
-  const [hours, setHours] = useState(1);
-  const [mins, setMins] = useState(0);
-  const [courseSettings, setCourseSettings] = useState<CourseSettings>({});
+function SettingsModal({
+  onClose,
+  courses,
+  settings,
+  onSave,
+}: {
+  onClose: () => void;
+  courses: Course[];
+  settings: UserSettings;
+  onSave: (patch: Partial<UserSettings>) => Promise<void>;
+}) {
+  const [hours, setHours] = useState(Math.floor(settings.reminder_minutes / 60));
+  const [mins, setMins] = useState(settings.reminder_minutes % 60);
+  const [perCourseNotify, setPerCourseNotify] = useState(settings.per_course_notify);
   const [saving, setSaving] = useState(false);
-  const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
-    fetch("/api/settings")
-      .then((res) => res.json())
-      .then((d) => {
-        if (d.reminder_minutes) {
-          setHours(Math.floor(d.reminder_minutes / 60));
-          setMins(d.reminder_minutes % 60);
-        }
-        setCourseSettings(d.course_settings || {});
-        setLoaded(true);
-      });
-  }, []);
+  const hiddenCourses = courses.filter((c) => settings.course_settings[c.id]?.hidden === true);
 
-  const toggleCourse = (courseId: string) => {
-    setCourseSettings((prev) => ({
-      ...prev,
-      [courseId]: { notify: !(prev[courseId]?.notify ?? true) },
-    }));
+  const unhideCourse = async (courseId: string) => {
+    const updated = {
+      ...settings.course_settings,
+      [courseId]: { ...settings.course_settings[courseId], hidden: false },
+    };
+    await onSave({ course_settings: updated });
   };
-
-  const isCourseNotifyEnabled = (courseId: string) =>
-    courseSettings[courseId]?.notify ?? true;
 
   const save = async () => {
     setSaving(true);
-    await fetch("/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        reminder_minutes: hours * 60 + mins,
-        course_settings: courseSettings,
-      }),
+    await onSave({
+      reminder_minutes: hours * 60 + mins,
+      per_course_notify: perCourseNotify,
     });
     setSaving(false);
     onClose();
@@ -234,38 +331,44 @@ function SettingsModal({ onClose, courses }: { onClose: () => void; courses: Cou
         </div>
 
         <div className="overflow-y-auto flex-1 p-6">
-          {!loaded ? (
-            <p className="text-gray-400 text-sm text-center py-4">読み込み中...</p>
-          ) : (
-            <>
-              <div className="mb-6">
-                <p className="text-sm font-semibold text-gray-700 mb-1">未提出リマインダー</p>
-                <p className="text-xs text-gray-400 mb-4">期限の何時間・何分前に通知するか</p>
-                <div className="flex items-center justify-center gap-4 bg-gray-50 rounded-2xl py-4 px-6">
-                  <PickerColumn values={hourValues} selected={hours} onChange={setHours} label="時間" />
-                  <span className="text-2xl font-bold text-gray-400 mb-6">:</span>
-                  <PickerColumn values={minValues} selected={mins} onChange={setMins} label="分" />
-                </div>
-                <p className="text-xs text-gray-400 mt-2">※新しく追加された課題から適用されます</p>
-              </div>
+          <div className="mb-6">
+            <p className="text-sm font-semibold text-gray-700 mb-1">未提出リマインダー</p>
+            <p className="text-xs text-gray-400 mb-4">期限の何時間・何分前に通知するか</p>
+            <div className="flex items-center justify-center gap-4 bg-gray-50 rounded-2xl py-4 px-6">
+              <PickerColumn values={hourValues} selected={hours} onChange={setHours} label="時間" />
+              <span className="text-2xl font-bold text-gray-400 mb-6">:</span>
+              <PickerColumn values={minValues} selected={mins} onChange={setMins} label="分" />
+            </div>
+            <p className="text-xs text-gray-400 mt-2">※新しく追加された課題から適用されます</p>
+          </div>
 
-              {courses.length > 0 && (
-                <div>
-                  <p className="text-sm font-semibold text-gray-700 mb-3">授業別通知設定</p>
-                  <div className="space-y-1">
-                    {courses.map((course) => (
-                      <div key={course.id} className="flex items-center justify-between py-2.5">
-                        <p className="text-sm text-gray-700 flex-1 pr-4 truncate">{course.name}</p>
-                        <Toggle
-                          enabled={isCourseNotifyEnabled(course.id)}
-                          onChange={() => toggleCourse(course.id)}
-                        />
-                      </div>
-                    ))}
+          <div className="mb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-gray-700">授業別に通知設定する</p>
+                <p className="text-xs text-gray-400 mt-0.5">オフにすると全授業で通知</p>
+              </div>
+              <Toggle enabled={perCourseNotify} onChange={() => setPerCourseNotify((v) => !v)} />
+            </div>
+          </div>
+
+          {hiddenCourses.length > 0 && (
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-3">非表示の授業</p>
+              <div className="space-y-1">
+                {hiddenCourses.map((course) => (
+                  <div key={course.id} className="flex items-center justify-between py-2.5">
+                    <p className="text-sm text-gray-700 flex-1 pr-4 truncate">{course.name}</p>
+                    <button
+                      onClick={() => unhideCourse(course.id)}
+                      className="text-xs text-blue-500 hover:text-blue-700 flex-shrink-0"
+                    >
+                      再表示
+                    </button>
                   </div>
-                </div>
-              )}
-            </>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 
@@ -292,23 +395,49 @@ function SettingsModal({ onClose, courses }: { onClose: () => void; courses: Cou
 export default function Home() {
   const { data: session } = useSession();
   const [data, setData] = useState<ClassroomData | null>(null);
+  const [settings, setSettings] = useState<UserSettings>({
+    reminder_minutes: 60,
+    course_settings: {},
+    per_course_notify: false,
+  });
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"courses" | "assignments">("courses");
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [hideTarget, setHideTarget] = useState<Course | null>(null);
 
   useEffect(() => {
     const accessToken = (session as any)?.accessToken;
     if (session && accessToken) {
       setLoading(true);
-      fetch("/api/classroom")
-        .then((res) => res.json())
-        .then((d) => {
-          if (d.noDue) setData(d);
-          setLoading(false);
+      Promise.all([
+        fetch("/api/classroom").then((r) => r.json()),
+        fetch("/api/settings").then((r) => r.json()),
+      ]).then(([classroomData, settingsData]) => {
+        if (classroomData.noDue) setData(classroomData);
+        setSettings({
+          reminder_minutes: settingsData.reminder_minutes ?? 60,
+          course_settings: settingsData.course_settings ?? {},
+          per_course_notify: settingsData.per_course_notify ?? false,
         });
+        setLoading(false);
+      });
     }
   }, [(session as any)?.accessToken]);
+
+  const saveSettings = useCallback(async (patch: Partial<UserSettings>) => {
+    const updated = { ...settings, ...patch };
+    setSettings(updated);
+    await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        reminder_minutes: updated.reminder_minutes,
+        course_settings: updated.course_settings,
+        per_course_notify: updated.per_course_notify,
+      }),
+    });
+  }, [settings]);
 
   const allAssignments = data
     ? [...data.noDue, ...data.thisWeek, ...data.nextWeek, ...data.later]
@@ -327,6 +456,41 @@ export default function Home() {
     setActiveTab("assignments");
   };
 
+  const visibleCourses = (data?.courses ?? [])
+    .filter((c) => settings.course_settings[c.id]?.hidden !== true)
+    .sort((a, b) => {
+      const ta = a.creationTime ? new Date(a.creationTime).getTime() : 0;
+      const tb = b.creationTime ? new Date(b.creationTime).getTime() : 0;
+      return tb - ta;
+    });
+
+  const isNotifyEnabled = (courseId: string) =>
+    settings.course_settings[courseId]?.notify ?? true;
+
+  const toggleCourseNotify = async (courseId: string) => {
+    const updated = {
+      ...settings.course_settings,
+      [courseId]: {
+        ...settings.course_settings[courseId],
+        notify: !isNotifyEnabled(courseId),
+      },
+    };
+    await saveSettings({ course_settings: updated });
+  };
+
+  const confirmHide = async () => {
+    if (!hideTarget) return;
+    const updated = {
+      ...settings.course_settings,
+      [hideTarget.id]: {
+        ...settings.course_settings[hideTarget.id],
+        hidden: true,
+      },
+    };
+    await saveSettings({ course_settings: updated });
+    setHideTarget(null);
+  };
+
   if (!session) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen">
@@ -343,10 +507,19 @@ export default function Home() {
 
   return (
     <>
+      {hideTarget && (
+        <HideConfirmDialog
+          courseName={hideTarget.name}
+          onConfirm={confirmHide}
+          onCancel={() => setHideTarget(null)}
+        />
+      )}
       {showSettings && (
         <SettingsModal
           onClose={() => setShowSettings(false)}
           courses={data?.courses ?? []}
+          settings={settings}
+          onSave={saveSettings}
         />
       )}
       <div className="max-w-3xl mx-auto p-8">
@@ -399,15 +572,19 @@ export default function Home() {
           <>
             {activeTab === "courses" && (
               <div>
-                {data.courses.length === 0 ? (
+                {visibleCourses.length === 0 ? (
                   <p className="text-gray-400 text-sm">授業が見つかりません</p>
                 ) : (
-                  data.courses.map((course) => (
+                  visibleCourses.map((course) => (
                     <CourseCard
                       key={course.id}
                       course={course}
                       pendingCount={getPendingCount(course.id)}
                       onOpen={() => openCourse(course.id)}
+                      perCourseNotify={settings.per_course_notify}
+                      notifyEnabled={isNotifyEnabled(course.id)}
+                      onToggleNotify={() => toggleCourseNotify(course.id)}
+                      onHide={() => setHideTarget(course)}
                     />
                   ))
                 )}
