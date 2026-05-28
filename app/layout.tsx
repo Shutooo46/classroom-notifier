@@ -1,6 +1,18 @@
 import type { Metadata } from "next";
+import { Press_Start_2P, DM_Sans } from "next/font/google";
 import Providers from "./providers";
 import "./globals.css";
+
+const pressStart = Press_Start_2P({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-pixel",
+});
+
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
 
 export const metadata: Metadata = {
   title: "Classroom Notifier",
@@ -13,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ja" className="bg-white">
+    <html lang="ja" className={`${pressStart.variable} ${dmSans.variable}`}>
       <body>
         <Providers>{children}</Providers>
       </body>
