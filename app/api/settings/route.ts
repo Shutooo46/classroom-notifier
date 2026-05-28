@@ -14,7 +14,7 @@ export async function GET() {
 
   const { data } = await supabase
     .from("user_settings")
-    .select("reminder_minutes, course_settings, per_course_notify")
+    .select("reminder_minutes, course_settings, per_course_notify, notify_announcements, notify_materials")
     .eq("user_id", userId)
     .single();
 
@@ -22,6 +22,8 @@ export async function GET() {
     reminder_minutes: data?.reminder_minutes ?? 60,
     course_settings: data?.course_settings ?? {},
     per_course_notify: data?.per_course_notify ?? false,
+    notify_announcements: data?.notify_announcements ?? true,
+    notify_materials: data?.notify_materials ?? true,
   });
 }
 
@@ -32,12 +34,14 @@ export async function POST(request: Request) {
   }
 
   const userId = (session as any).userId;
-  const { reminder_minutes, course_settings, per_course_notify } = await request.json();
+  const { reminder_minutes, course_settings, per_course_notify, notify_announcements, notify_materials } = await request.json();
 
   const updateData: Record<string, any> = { user_id: userId };
   if (reminder_minutes !== undefined) updateData.reminder_minutes = reminder_minutes;
   if (course_settings !== undefined) updateData.course_settings = course_settings;
   if (per_course_notify !== undefined) updateData.per_course_notify = per_course_notify;
+  if (notify_announcements !== undefined) updateData.notify_announcements = notify_announcements;
+  if (notify_materials !== undefined) updateData.notify_materials = notify_materials;
 
   await supabase
     .from("user_settings")
