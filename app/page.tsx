@@ -37,6 +37,8 @@ type UserSettings = {
   reminder_minutes: number;
   course_settings: CourseSettings;
   per_course_notify: boolean;
+  notify_announcements: boolean;
+  notify_materials: boolean;
 };
 
 function Toggle({ enabled, onChange }: { enabled: boolean; onChange: () => void }) {
@@ -297,6 +299,8 @@ function SettingsModal({
   const [hours, setHours] = useState(Math.floor(settings.reminder_minutes / 60));
   const [mins, setMins] = useState(settings.reminder_minutes % 60);
   const [perCourseNotify, setPerCourseNotify] = useState(settings.per_course_notify);
+  const [notifyAnnouncements, setNotifyAnnouncements] = useState(settings.notify_announcements);
+  const [notifyMaterials, setNotifyMaterials] = useState(settings.notify_materials);
   const [saving, setSaving] = useState(false);
 
   const hiddenCourses = courses.filter((c) => settings.course_settings[c.id]?.hidden === true);
@@ -314,6 +318,8 @@ function SettingsModal({
     await onSave({
       reminder_minutes: hours * 60 + mins,
       per_course_notify: perCourseNotify,
+      notify_announcements: notifyAnnouncements,
+      notify_materials: notifyMaterials,
     });
     setSaving(false);
     onClose();
@@ -342,13 +348,22 @@ function SettingsModal({
             <p className="text-xs text-gray-400 mt-2">※新しく追加された課題から適用されます</p>
           </div>
 
-          <div className="mb-6">
+          <div className="mb-6 space-y-4">
+            <p className="text-sm font-semibold text-gray-700">通知設定</p>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-semibold text-gray-700">授業別に通知設定する</p>
+                <p className="text-sm text-gray-700">授業別に通知設定する</p>
                 <p className="text-xs text-gray-400 mt-0.5">オフにすると全授業で通知</p>
               </div>
               <Toggle enabled={perCourseNotify} onChange={() => setPerCourseNotify((v) => !v)} />
+            </div>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-700">お知らせ通知</p>
+              <Toggle enabled={notifyAnnouncements} onChange={() => setNotifyAnnouncements((v) => !v)} />
+            </div>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-700">資料投稿通知</p>
+              <Toggle enabled={notifyMaterials} onChange={() => setNotifyMaterials((v) => !v)} />
             </div>
           </div>
 
@@ -399,6 +414,8 @@ export default function Home() {
     reminder_minutes: 60,
     course_settings: {},
     per_course_notify: false,
+    notify_announcements: true,
+    notify_materials: true,
   });
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"courses" | "assignments">("courses");
@@ -419,6 +436,8 @@ export default function Home() {
           reminder_minutes: settingsData.reminder_minutes ?? 60,
           course_settings: settingsData.course_settings ?? {},
           per_course_notify: settingsData.per_course_notify ?? false,
+          notify_announcements: settingsData.notify_announcements ?? true,
+          notify_materials: settingsData.notify_materials ?? true,
         });
         setLoading(false);
       });
