@@ -263,6 +263,74 @@ app.post("/process", async (req, res) => {
   }
 });
 
+app.post("/process-announcement", async (req, res) => {
+  const { announcement, course } = req.body;
+
+  try {
+    const text = announcement.text
+      ? announcement.text.length > 300
+        ? announcement.text.slice(0, 300) + "..."
+        : announcement.text
+      : "（本文なし）";
+
+    await fetch(process.env.DISCORD_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        embeds: [{
+          title: "📢 新しいお知らせが届きました",
+          color: 0xf4b400,
+          fields: [
+            { name: "コース", value: course.name, inline: false },
+            { name: "内容", value: text, inline: false },
+          ],
+          timestamp: announcement.creationTime,
+        }]
+      }),
+    });
+
+    res.json({ message: "Done" });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+app.post("/process-material", async (req, res) => {
+  const { material, course, accessToken, driveFileIds } = req.body;
+
+  try {
+    const summary = await summarizeAssignment(
+      material.title,
+      material.description || "",
+      driveFileIds || [],
+      accessToken || ""
+    );
+
+    await fetch(process.env.DISCORD_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        embeds: [{
+          title: "📁 新しい資料が追加されました",
+          color: 0x0f9d58,
+          fields: [
+            { name: "タイトル", value: material.title, inline: false },
+            { name: "コース", value: course.name, inline: false },
+            { name: "📝 AI要約", value: summary, inline: false },
+          ],
+          timestamp: material.creationTime,
+        }]
+      }),
+    });
+
+    res.json({ message: "Done" });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e) });
+  }
+});
+
 const port = process.env.PORT || 8080;
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
