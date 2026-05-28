@@ -169,9 +169,12 @@ function AddCustomAssignmentModal({ onClose, onAdd, defaultCourseName }: {
 
   return (
     <div style={{ backgroundColor: "rgba(0,0,0,0.5)" }} className="fixed inset-0 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-80 border-2 border-black shadow-[6px_6px_0px_#1a1a1a] p-6 max-h-[90vh] overflow-y-auto">
-        <p className="font-pixel text-black mb-5" style={{ fontSize: "9px" }}>ADD TASK</p>
-        <div className="space-y-3">
+      <div className="bg-white rounded-2xl w-80 border-2 border-black shadow-[6px_6px_0px_#1a1a1a] max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-6 pb-4 border-b-2 border-black">
+          <p className="font-pixel text-black" style={{ fontSize: "9px" }}>ADD TASK</p>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg border-2 border-black hover:bg-gray-100 font-bold text-sm">✕</button>
+        </div>
+        <div className="overflow-y-auto flex-1 p-6 space-y-3">
           <div>
             <p className="font-pixel text-gray-500 mb-1" style={{ fontSize: "7px" }}>TITLE *</p>
             <input
@@ -219,7 +222,7 @@ function AddCustomAssignmentModal({ onClose, onAdd, defaultCourseName }: {
             )}
           </div>
         </div>
-        <div className="flex gap-3 mt-5">
+        <div className="flex gap-3 p-6 pt-4 border-t-2 border-black">
           <button onClick={onClose} className="flex-1 border-2 border-black py-2 rounded-xl text-sm font-semibold hover:bg-gray-100">
             キャンセル
           </button>
@@ -430,9 +433,12 @@ function AddRecurringAssignmentModal({ onClose, onAdd, onAddAssignments, default
 
   return (
     <div style={{ backgroundColor: "rgba(0,0,0,0.5)" }} className="fixed inset-0 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-80 border-2 border-black shadow-[6px_6px_0px_#1a1a1a] p-6 max-h-[90vh] overflow-y-auto">
-        <p className="font-pixel text-black mb-5" style={{ fontSize: "9px" }}>ADD RECURRING</p>
-        <div className="space-y-4">
+      <div className="bg-white rounded-2xl w-80 border-2 border-black shadow-[6px_6px_0px_#1a1a1a] max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-6 pb-4 border-b-2 border-black">
+          <p className="font-pixel text-black" style={{ fontSize: "9px" }}>ADD RECURRING</p>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg border-2 border-black hover:bg-gray-100 font-bold text-sm">✕</button>
+        </div>
+        <div className="overflow-y-auto flex-1 p-6 space-y-4">
           <div>
             <p className="font-pixel text-gray-500 mb-1" style={{ fontSize: "7px" }}>TITLE *</p>
             <input
@@ -515,7 +521,7 @@ function AddRecurringAssignmentModal({ onClose, onAdd, onAddAssignments, default
           </div>
           {errorMsg && <p className="text-xs text-red-500 font-semibold">{errorMsg}</p>}
         </div>
-        <div className="flex gap-3 mt-5">
+        <div className="flex gap-3 p-6 pt-4 border-t-2 border-black">
           <button onClick={onClose} className="flex-1 border-2 border-black py-2 rounded-xl text-sm font-semibold hover:bg-gray-100">
             キャンセル
           </button>
