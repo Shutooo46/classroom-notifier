@@ -127,6 +127,12 @@ function AddCustomAssignmentModal({ onClose, onAdd, defaultCourseName }: {
 }) {
   const now = new Date();
   const [title, setTitle] = useState("");
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
   const [courseName, setCourseName] = useState(defaultCourseName ?? "");
   const [hasDue, setHasDue] = useState(true);
   const [dueMonth, setDueMonth] = useState(now.getMonth());
@@ -895,6 +901,12 @@ function SettingsModal({ onClose, courses, settings, onSave }: {
   onSave: (patch: Partial<UserSettings>) => Promise<void>;
 }) {
   const [hours, setHours] = useState(Math.floor(settings.reminder_minutes / 60));
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
   const [mins, setMins] = useState(settings.reminder_minutes % 60);
   const [perCourseNotify, setPerCourseNotify] = useState(settings.per_course_notify);
   const [notifyAnnouncements, setNotifyAnnouncements] = useState(settings.notify_announcements);
