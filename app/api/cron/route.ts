@@ -41,11 +41,12 @@ export async function GET(request: Request) {
 
     const { data: settings } = await supabase
       .from("user_settings")
-      .select("reminder_minutes, course_settings")
+      .select("reminder_minutes, course_settings, per_course_notify")
       .eq("user_id", user.user_id)
       .single();
     const reminderMinutes = settings?.reminder_minutes ?? 60;
-    const courseSettings: Record<string, { notify: boolean }> = settings?.course_settings ?? {};
+    const courseSettings: Record<string, { notify: boolean; hidden?: boolean }> = settings?.course_settings ?? {};
+    const perCourseNotify: boolean = settings?.per_course_notify ?? false;
 
     const coursesRes = await fetch(
       "https://classroom.googleapis.com/v1/courses?courseStates=ACTIVE",
@@ -55,7 +56,7 @@ export async function GET(request: Request) {
     const courses = coursesData.courses || [];
 
     for (const course of courses) {
-      if (courseSettings[course.id]?.notify === false) continue;
+      if (perCourseNotify && courseSettings[course.id]?.notify === false) continue;
       const workRes = await fetch(
         `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork`,
         { headers: { Authorization: `Bearer ${accessToken}` } }

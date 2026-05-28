@@ -107,7 +107,7 @@ else later.push(a);
 
 return NextResponse.json(
   {
-    courses: courses.map((c: any) => ({ id: c.id, name: c.name })),
+    courses: courses.map((c: any) => ({ id: c.id, name: c.name, creationTime: c.creationTime })),
     noDue, thisWeek, nextWeek, later,
   },
   { headers: { "Cache-Control": "no-store" } }
