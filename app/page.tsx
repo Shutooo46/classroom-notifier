@@ -168,8 +168,8 @@ function AddCustomAssignmentModal({ onClose, onAdd, defaultCourseName }: {
   };
 
   return (
-    <div style={{ backgroundColor: "rgba(0,0,0,0.5)" }} className="fixed inset-0 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl w-80 border-2 border-black shadow-[6px_6px_0px_#1a1a1a] p-6">
+    <div style={{ backgroundColor: "rgba(0,0,0,0.5)" }} className="fixed inset-0 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-80 border-2 border-black shadow-[6px_6px_0px_#1a1a1a] p-6 max-h-[90vh] overflow-y-auto">
         <p className="font-pixel text-black mb-5" style={{ fontSize: "9px" }}>ADD TASK</p>
         <div className="space-y-3">
           <div>
