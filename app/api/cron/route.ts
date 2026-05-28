@@ -41,12 +41,14 @@ export async function GET(request: Request) {
 
     const { data: settings } = await supabase
       .from("user_settings")
-      .select("reminder_minutes, course_settings, per_course_notify")
+      .select("reminder_minutes, course_settings, per_course_notify, notify_announcements, notify_materials")
       .eq("user_id", user.user_id)
       .single();
     const reminderMinutes = settings?.reminder_minutes ?? 60;
     const courseSettings: Record<string, { notify: boolean; hidden?: boolean }> = settings?.course_settings ?? {};
     const perCourseNotify: boolean = settings?.per_course_notify ?? false;
+    const notifyAnnouncements: boolean = settings?.notify_announcements ?? true;
+    const notifyMaterials: boolean = settings?.notify_materials ?? true;
 
     const coursesRes = await fetch(
       "https://classroom.googleapis.com/v1/courses?courseStates=ACTIVE",
@@ -134,6 +136,93 @@ export async function GET(request: Request) {
               driveFileIds,
             }),
           }).catch((e) => console.error("Cloud Run error:", e));
+        }
+      }
+
+      // お知らせ通知
+      if (notifyAnnouncements) {
+        const annRes = await fetch(
+          `https://classroom.googleapis.com/v1/courses/${course.id}/announcements?orderBy=updateTime%20desc`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        const annData = await annRes.json();
+        const announcements = annData.announcements || [];
+
+        for (const announcement of announcements) {
+          const createdAt = new Date(announcement.creationTime);
+          const twoWeeksAgo = new Date();
+          twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+          if (createdAt < twoWeeksAgo) continue;
+
+          const { data: existing } = await supabase
+            .from("notified_assignments")
+            .select("id")
+            .eq("assignment_id", announcement.id)
+            .eq("user_id", user.user_id)
+            .eq("notification_type", "announcement")
+            .single();
+
+          if (!existing) {
+            await supabase.from("notified_assignments").insert({
+              assignment_id: announcement.id,
+              user_id: user.user_id,
+              notified_at: new Date().toISOString(),
+              notification_type: "announcement",
+            });
+
+            fetch(`${process.env.CLOUD_RUN_URL}/process-announcement`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ announcement, course, user_id: user.user_id }),
+            }).catch((e) => console.error("Cloud Run announcement error:", e));
+          }
+        }
+      }
+
+      // 資料投稿通知
+      if (notifyMaterials) {
+        const matRes = await fetch(
+          `https://classroom.googleapis.com/v1/courses/${course.id}/courseWorkMaterials?orderBy=updateTime%20desc`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        const matData = await matRes.json();
+        const materials = matData.courseWorkMaterial || [];
+
+        for (const material of materials) {
+          const createdAt = new Date(material.creationTime);
+          const twoWeeksAgo = new Date();
+          twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+          if (createdAt < twoWeeksAgo) continue;
+
+          const { data: existing } = await supabase
+            .from("notified_assignments")
+            .select("id")
+            .eq("assignment_id", material.id)
+            .eq("user_id", user.user_id)
+            .eq("notification_type", "material")
+            .single();
+
+          if (!existing) {
+            await supabase.from("notified_assignments").insert({
+              assignment_id: material.id,
+              user_id: user.user_id,
+              notified_at: new Date().toISOString(),
+              notification_type: "material",
+            });
+
+            const driveFileIds: string[] = [];
+            if (material.materials) {
+              for (const m of material.materials) {
+                if (m.driveFile?.driveFile?.id) driveFileIds.push(m.driveFile.driveFile.id);
+              }
+            }
+
+            fetch(`${process.env.CLOUD_RUN_URL}/process-material`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ material, course, user_id: user.user_id, accessToken, driveFileIds }),
+            }).catch((e) => console.error("Cloud Run material error:", e));
+          }
         }
       }
     }
