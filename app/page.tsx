@@ -125,11 +125,26 @@ function AddCustomAssignmentModal({ onClose, onAdd, defaultCourseName }: {
   onAdd: (a: CustomAssignment) => void;
   defaultCourseName?: string;
 }) {
+  const now = new Date();
   const [title, setTitle] = useState("");
   const [courseName, setCourseName] = useState(defaultCourseName ?? "");
-  const [dueDate, setDueDate] = useState("");
+  const [hasDue, setHasDue] = useState(true);
+  const [dueMonth, setDueMonth] = useState(now.getMonth());
+  const [dueDay, setDueDay] = useState(now.getDate() - 1);
+  const [dueHour, setDueHour] = useState(23);
+  const [dueMinute, setDueMinute] = useState(59);
   const [saving, setSaving] = useState(false);
   const locked = !!defaultCourseName;
+
+  const monthValues = Array.from({ length: 12 }, (_, i) => String(i + 1));
+  const dayValues = Array.from({ length: 31 }, (_, i) => String(i + 1));
+  const hourValues = Array.from({ length: 24 }, (_, i) => String(i));
+  const minValues = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
+
+  const dueDateStr = hasDue
+    ? `${now.getFullYear()}-${String(dueMonth + 1).padStart(2, "0")}-${String(dueDay + 1).padStart(2, "0")}`
+    : null;
+  const dueTimeStr = `${String(dueHour).padStart(2, "0")}:${String(dueMinute).padStart(2, "0")}`;
 
   const save = async () => {
     if (!title.trim()) return;
@@ -137,13 +152,10 @@ function AddCustomAssignmentModal({ onClose, onAdd, defaultCourseName }: {
     const res = await fetch("/api/custom-assignments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, course_name: courseName, due_date: dueDate || null }),
+      body: JSON.stringify({ title, course_name: courseName, due_date: dueDateStr, due_time: hasDue ? dueTimeStr : null }),
     });
     const data = await res.json();
-    if (!res.ok || !data.id) {
-      setSaving(false);
-      return;
-    }
+    if (!res.ok || !data.id) { setSaving(false); return; }
     onAdd(data);
     setSaving(false);
     onClose();
@@ -176,13 +188,29 @@ function AddCustomAssignmentModal({ onClose, onAdd, defaultCourseName }: {
             />
           </div>
           <div>
-            <p className="font-pixel text-gray-500 mb-1" style={{ fontSize: "7px" }}>DUE DATE</p>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="w-full border-2 border-black rounded-xl px-3 py-2 text-sm focus:outline-none"
-            />
+            <div className="flex items-center justify-between mb-2">
+              <p className="font-pixel text-gray-500" style={{ fontSize: "7px" }}>DUE DATE</p>
+              <button
+                onClick={() => setHasDue((v) => !v)}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full border-2 border-black transition-colors ${hasDue ? "bg-black" : "bg-white"}`}
+              >
+                <span className={`inline-block h-3 w-3 rounded-full border-2 border-black transition-transform ${hasDue ? "translate-x-4 bg-[#c8f135]" : "translate-x-0.5 bg-white"}`} />
+              </button>
+            </div>
+            {hasDue && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-center gap-3 bg-gray-50 rounded-2xl py-3 px-4 border-2 border-black">
+                  <PickerColumn values={monthValues} selected={dueMonth} onChange={setDueMonth} label="月" />
+                  <span className="font-pixel text-gray-300 mb-6" style={{ fontSize: "16px" }}>/</span>
+                  <PickerColumn values={dayValues} selected={dueDay} onChange={setDueDay} label="日" />
+                </div>
+                <div className="flex items-center justify-center gap-3 bg-gray-50 rounded-2xl py-3 px-4 border-2 border-black">
+                  <PickerColumn values={hourValues} selected={dueHour} onChange={setDueHour} label="時" />
+                  <span className="font-pixel text-gray-300 mb-6" style={{ fontSize: "20px" }}>:</span>
+                  <PickerColumn values={minValues} selected={dueMinute} onChange={setDueMinute} label="分" />
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex gap-3 mt-5">
@@ -351,9 +379,14 @@ function AddRecurringAssignmentModal({ onClose, onAdd, onAddAssignments, default
   const [dayOfWeek, setDayOfWeek] = useState(1);
   const [intervalWeeks, setIntervalWeeks] = useState(1);
   const [dueDaysOffset, setDueDaysOffset] = useState(0);
-  const [dueTime, setDueTime] = useState("23:59");
+  const [dueHour, setDueHour] = useState(23);
+  const [dueMinute, setDueMinute] = useState(59);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  const hourValues = Array.from({ length: 24 }, (_, i) => String(i));
+  const minValues = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
+  const dueTimeStr = `${String(dueHour).padStart(2, "0")}:${String(dueMinute).padStart(2, "0")}`;
 
   const nextAssigned = getNextDayOfWeek(dayOfWeek);
   const nextDue = new Date(nextAssigned);
@@ -368,7 +401,7 @@ function AddRecurringAssignmentModal({ onClose, onAdd, onAddAssignments, default
     const res = await fetch("/api/recurring-assignments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, course_name: courseName, day_of_week: dayOfWeek, interval_weeks: intervalWeeks, due_days_offset: dueDaysOffset, due_time: dueTime }),
+      body: JSON.stringify({ title, course_name: courseName, day_of_week: dayOfWeek, interval_weeks: intervalWeeks, due_days_offset: dueDaysOffset, due_time: dueTimeStr }),
     });
     const data = await res.json();
     if (!res.ok || !data.id) {
@@ -383,9 +416,15 @@ function AddRecurringAssignmentModal({ onClose, onAdd, onAddAssignments, default
     onClose();
   };
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
   return (
-    <div style={{ backgroundColor: "rgba(0,0,0,0.5)" }} className="fixed inset-0 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl w-80 border-2 border-black shadow-[6px_6px_0px_#1a1a1a] p-6">
+    <div style={{ backgroundColor: "rgba(0,0,0,0.5)" }} className="fixed inset-0 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-80 border-2 border-black shadow-[6px_6px_0px_#1a1a1a] p-6 max-h-[90vh] overflow-y-auto">
         <p className="font-pixel text-black mb-5" style={{ fontSize: "9px" }}>ADD RECURRING</p>
         <div className="space-y-4">
           <div>
@@ -452,12 +491,11 @@ function AddRecurringAssignmentModal({ onClose, onAdd, onAddAssignments, default
           </div>
           <div>
             <p className="font-pixel text-gray-500 mb-1.5" style={{ fontSize: "7px" }}>締め切り時刻</p>
-            <input
-              type="time"
-              value={dueTime}
-              onChange={(e) => setDueTime(e.target.value)}
-              className="w-full border-2 border-black rounded-xl px-3 py-2 text-sm focus:outline-none"
-            />
+            <div className="flex items-center justify-center gap-3 bg-gray-50 rounded-2xl py-3 px-4 border-2 border-black">
+              <PickerColumn values={hourValues} selected={dueHour} onChange={setDueHour} label="時" />
+              <span className="font-pixel text-gray-300 mb-6" style={{ fontSize: "20px" }}>:</span>
+              <PickerColumn values={minValues} selected={dueMinute} onChange={setDueMinute} label="分" />
+            </div>
           </div>
           <div className="bg-gray-50 rounded-xl px-3 py-2.5 border-2 border-black space-y-1">
             <div className="flex items-center justify-between">
@@ -466,7 +504,7 @@ function AddRecurringAssignmentModal({ onClose, onAdd, onAddAssignments, default
             </div>
             <div className="flex items-center justify-between">
               <span className="font-pixel text-[#ff6b6b]" style={{ fontSize: "6px" }}>期限</span>
-              <span className="text-xs font-bold text-black">{dueLabel} {dueTime}</span>
+              <span className="text-xs font-bold text-black">{dueLabel} {dueTimeStr}</span>
             </div>
           </div>
           {errorMsg && <p className="text-xs text-red-500 font-semibold">{errorMsg}</p>}
