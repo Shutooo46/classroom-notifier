@@ -331,6 +331,43 @@ app.post("/process-material", async (req, res) => {
   }
 });
 
+app.post("/process-custom-reminder", async (req, res) => {
+  const { assignment, reminderType, reminderMinutes } = req.body;
+
+  try {
+    const dueDateStr = assignment.due_date
+      ? new Date(assignment.due_date + "T14:59:00Z").toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", weekday: "short" })
+      : "期限なし";
+
+    const isUrgent = reminderType === "reminder";
+    const title = isUrgent
+      ? `🚨 カスタム課題 - あと${reminderMinutes}分！`
+      : "⏰ カスタム課題 - 24時間前リマインド";
+    const color = isUrgent ? 0xff6b6b : 0xffa500;
+
+    await fetch(process.env.DISCORD_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        embeds: [{
+          title,
+          color,
+          fields: [
+            { name: "課題", value: assignment.title, inline: false },
+            { name: "授業", value: assignment.course_name, inline: false },
+            { name: "期限", value: dueDateStr, inline: false },
+          ],
+        }]
+      }),
+    });
+
+    res.json({ message: "Done" });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e) });
+  }
+});
+
 const port = process.env.PORT || 8080;
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);

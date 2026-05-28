@@ -29,6 +29,34 @@ type ClassroomData = {
   later: Assignment[];
 };
 
+type CustomAssignment = {
+  id: string;
+  title: string;
+  course_name: string;
+  due_date: string | null;
+  due_time: string | null;
+  submitted: boolean;
+  created_at: string;
+};
+
+type CustomCourse = {
+  id: string;
+  name: string;
+  created_at: string;
+};
+
+type RecurringAssignment = {
+  id: string;
+  title: string;
+  course_name: string;
+  day_of_week: number;
+  interval_weeks: number;
+  due_days_offset: number;
+  due_time: string;
+  active: boolean;
+  created_at: string;
+};
+
 type CourseSettings = {
   [courseId: string]: { notify: boolean; hidden?: boolean };
 };
@@ -78,6 +106,483 @@ function getUrgency(dueDate?: Assignment["dueDate"], submitted?: boolean): "done
   if (diffDays <= 1) return "high";
   if (diffDays <= 7) return "mid";
   return "low";
+}
+
+function getUrgencyFromDateStr(dateStr: string | null, submitted: boolean): "done" | "high" | "mid" | "low" | "none" {
+  if (submitted) return "done";
+  if (!dateStr) return "none";
+  const now = new Date();
+  const due = new Date(dateStr);
+  const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays <= 1) return "high";
+  if (diffDays <= 7) return "mid";
+  return "low";
+}
+
+// ---- 手動課題追加モーダル ----
+function AddCustomAssignmentModal({ onClose, onAdd, defaultCourseName }: {
+  onClose: () => void;
+  onAdd: (a: CustomAssignment) => void;
+  defaultCourseName?: string;
+}) {
+  const [title, setTitle] = useState("");
+  const [courseName, setCourseName] = useState(defaultCourseName ?? "");
+  const [dueDate, setDueDate] = useState("");
+  const [saving, setSaving] = useState(false);
+  const locked = !!defaultCourseName;
+
+  const save = async () => {
+    if (!title.trim()) return;
+    setSaving(true);
+    const res = await fetch("/api/custom-assignments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, course_name: courseName, due_date: dueDate || null }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.id) {
+      setSaving(false);
+      return;
+    }
+    onAdd(data);
+    setSaving(false);
+    onClose();
+  };
+
+  return (
+    <div style={{ backgroundColor: "rgba(0,0,0,0.5)" }} className="fixed inset-0 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl w-80 border-2 border-black shadow-[6px_6px_0px_#1a1a1a] p-6">
+        <p className="font-pixel text-black mb-5" style={{ fontSize: "9px" }}>ADD TASK</p>
+        <div className="space-y-3">
+          <div>
+            <p className="font-pixel text-gray-500 mb-1" style={{ fontSize: "7px" }}>TITLE *</p>
+            <input
+              autoFocus
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && save()}
+              placeholder="課題タイトル"
+              className="w-full border-2 border-black rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-black"
+            />
+          </div>
+          <div>
+            <p className="font-pixel text-gray-500 mb-1" style={{ fontSize: "7px" }}>COURSE</p>
+            <input
+              value={courseName}
+              onChange={(e) => { if (!locked) setCourseName(e.target.value); }}
+              readOnly={locked}
+              placeholder="授業名（省略可）"
+              className={`w-full border-2 border-black rounded-xl px-3 py-2 text-sm focus:outline-none ${locked ? "bg-gray-50 text-gray-500 cursor-default" : ""}`}
+            />
+          </div>
+          <div>
+            <p className="font-pixel text-gray-500 mb-1" style={{ fontSize: "7px" }}>DUE DATE</p>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="w-full border-2 border-black rounded-xl px-3 py-2 text-sm focus:outline-none"
+            />
+          </div>
+        </div>
+        <div className="flex gap-3 mt-5">
+          <button onClick={onClose} className="flex-1 border-2 border-black py-2 rounded-xl text-sm font-semibold hover:bg-gray-100">
+            キャンセル
+          </button>
+          <button
+            onClick={save}
+            disabled={saving || !title.trim()}
+            className="flex-1 border-2 border-black py-2 rounded-xl text-sm font-semibold bg-black text-[#c8f135] hover:opacity-90 disabled:opacity-40"
+          >
+            {saving ? "..." : "追加"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- 手動課題カード ----
+function CustomAssignmentCard({ assignment, onToggle, onDelete }: {
+  assignment: CustomAssignment;
+  onToggle: () => void;
+  onDelete: () => void;
+}) {
+  const urgency = getUrgencyFromDateStr(assignment.due_date, assignment.submitted);
+
+  const cardBase = "rounded-2xl p-4 mb-2 flex items-start justify-between transition-all border-dashed border-2";
+  const cardStyle: Record<string, string> = {
+    done: `${cardBase} border-black bg-gray-100 shadow-[3px_3px_0px_#1a1a1a] opacity-60`,
+    high: `${cardBase} border-[#ff6b6b] bg-white shadow-[3px_3px_0px_#ff6b6b]`,
+    mid:  `${cardBase} border-black bg-white shadow-[3px_3px_0px_#1a1a1a] border-l-[6px] border-l-[#c8f135]`,
+    low:  `${cardBase} border-black bg-white shadow-[3px_3px_0px_#1a1a1a] border-l-[6px] border-l-[#7dd3fc]`,
+    none: `${cardBase} border-black bg-white shadow-[3px_3px_0px_#1a1a1a]`,
+  };
+
+  const dueLabel = assignment.due_date
+    ? (() => { const d = new Date(assignment.due_date); return `${d.getMonth() + 1}/${d.getDate()}`; })()
+    : null;
+
+  return (
+    <div className={cardStyle[urgency]}>
+      <div className="flex items-start gap-3 flex-1 min-w-0">
+        <button
+          onClick={onToggle}
+          className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${assignment.submitted ? "bg-[#c8f135] border-black" : "bg-white border-black"}`}
+        >
+          {assignment.submitted && (
+            <svg className="w-3 h-3 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+        </button>
+        <div className="min-w-0">
+          <p className={`text-sm font-semibold truncate ${assignment.submitted ? "text-gray-400 line-through" : "text-black"}`}>
+            {assignment.title}
+          </p>
+          <p className="text-xs text-gray-500 mt-0.5 truncate">{assignment.course_name}</p>
+          <div className="flex items-center gap-2 mt-1.5">
+            <UrgencyBadge dueDate={assignment.due_date ? (() => { const d = new Date(assignment.due_date!); return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() }; })() : undefined} submitted={assignment.submitted} />
+            {dueLabel && <span className="text-xs text-gray-400">{dueLabel}</span>}
+          </div>
+        </div>
+      </div>
+      <button
+        onClick={onDelete}
+        className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0 ml-3 p-1"
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+// ---- カスタム授業追加モーダル ----
+function AddCustomCourseModal({ onClose, onAdd }: {
+  onClose: () => void;
+  onAdd: (c: CustomCourse) => void;
+}) {
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    const res = await fetch("/api/custom-courses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.id) {
+      setSaving(false);
+      return;
+    }
+    onAdd(data);
+    setSaving(false);
+    onClose();
+  };
+
+  return (
+    <div style={{ backgroundColor: "rgba(0,0,0,0.5)" }} className="fixed inset-0 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl w-80 border-2 border-black shadow-[6px_6px_0px_#1a1a1a] p-6">
+        <p className="font-pixel text-black mb-5" style={{ fontSize: "9px" }}>ADD COURSE</p>
+        <div>
+          <p className="font-pixel text-gray-500 mb-1" style={{ fontSize: "7px" }}>COURSE NAME *</p>
+          <input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && save()}
+            placeholder="授業名"
+            className="w-full border-2 border-black rounded-xl px-3 py-2 text-sm focus:outline-none"
+          />
+        </div>
+        <div className="flex gap-3 mt-5">
+          <button onClick={onClose} className="flex-1 border-2 border-black py-2 rounded-xl text-sm font-semibold hover:bg-gray-100">
+            キャンセル
+          </button>
+          <button
+            onClick={save}
+            disabled={saving || !name.trim()}
+            className="flex-1 border-2 border-black py-2 rounded-xl text-sm font-semibold bg-black text-[#c8f135] hover:opacity-90 disabled:opacity-40"
+          >
+            {saving ? "..." : "追加"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- 繰り返し課題追加モーダル ----
+const DAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
+
+function getNextDayOfWeek(dayOfWeek: number): Date {
+  const now = new Date();
+  const daysUntil = (dayOfWeek - now.getDay() + 7) % 7;
+  const next = new Date(now);
+  next.setDate(now.getDate() + daysUntil);
+  return next;
+}
+
+const DUE_OFFSET_OPTIONS = [
+  { label: "当日", val: 0 },
+  { label: "翌日", val: 1 },
+  { label: "3日後", val: 3 },
+  { label: "1週間後", val: 7 },
+  { label: "2週間後", val: 14 },
+];
+
+function offsetLabel(val: number): string {
+  return DUE_OFFSET_OPTIONS.find((o) => o.val === val)?.label ?? `${val}日後`;
+}
+
+function AddRecurringAssignmentModal({ onClose, onAdd, onAddAssignments, defaultCourseName }: {
+  onClose: () => void;
+  onAdd: (r: RecurringAssignment) => void;
+  onAddAssignments: (assignments: CustomAssignment[]) => void;
+  defaultCourseName?: string;
+}) {
+  const [title, setTitle] = useState("");
+  const [courseName] = useState(defaultCourseName ?? "");
+  const [dayOfWeek, setDayOfWeek] = useState(1);
+  const [intervalWeeks, setIntervalWeeks] = useState(1);
+  const [dueDaysOffset, setDueDaysOffset] = useState(0);
+  const [dueTime, setDueTime] = useState("23:59");
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const nextAssigned = getNextDayOfWeek(dayOfWeek);
+  const nextDue = new Date(nextAssigned);
+  nextDue.setDate(nextAssigned.getDate() + dueDaysOffset);
+  const assignedLabel = `${nextAssigned.getMonth() + 1}/${nextAssigned.getDate()}（${DAY_LABELS[nextAssigned.getDay()]}）`;
+  const dueLabel = `${nextDue.getMonth() + 1}/${nextDue.getDate()}（${DAY_LABELS[nextDue.getDay()]}）`;
+
+  const save = async () => {
+    if (!title.trim()) return;
+    setSaving(true);
+    setErrorMsg("");
+    const res = await fetch("/api/recurring-assignments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, course_name: courseName, day_of_week: dayOfWeek, interval_weeks: intervalWeeks, due_days_offset: dueDaysOffset, due_time: dueTime }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.id) {
+      setErrorMsg(data.error ?? "追加に失敗しました");
+      setSaving(false);
+      return;
+    }
+    const { _generatedAssignments, ...recurring } = data;
+    onAdd(recurring as RecurringAssignment);
+    if (Array.isArray(_generatedAssignments)) onAddAssignments(_generatedAssignments);
+    setSaving(false);
+    onClose();
+  };
+
+  return (
+    <div style={{ backgroundColor: "rgba(0,0,0,0.5)" }} className="fixed inset-0 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl w-80 border-2 border-black shadow-[6px_6px_0px_#1a1a1a] p-6">
+        <p className="font-pixel text-black mb-5" style={{ fontSize: "9px" }}>ADD RECURRING</p>
+        <div className="space-y-4">
+          <div>
+            <p className="font-pixel text-gray-500 mb-1" style={{ fontSize: "7px" }}>TITLE *</p>
+            <input
+              autoFocus
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && save()}
+              placeholder="課題タイトル"
+              className="w-full border-2 border-black rounded-xl px-3 py-2 text-sm focus:outline-none"
+            />
+          </div>
+          {defaultCourseName && (
+            <div>
+              <p className="font-pixel text-gray-500 mb-1" style={{ fontSize: "7px" }}>COURSE</p>
+              <p className="text-sm font-semibold text-gray-500 px-3 py-2 bg-gray-50 rounded-xl border-2 border-black">{defaultCourseName}</p>
+            </div>
+          )}
+          <div>
+            <p className="font-pixel text-gray-500 mb-1.5" style={{ fontSize: "7px" }}>出題される曜日</p>
+            <div className="flex gap-1">
+              {DAY_LABELS.map((label, i) => (
+                <button
+                  key={i}
+                  onClick={() => setDayOfWeek(i)}
+                  className={`flex-1 py-1.5 rounded-lg border-2 text-xs font-bold transition-colors ${dayOfWeek === i ? "bg-black text-[#c8f135] border-black" : "bg-white text-black border-black hover:bg-gray-100"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="font-pixel text-gray-500 mb-1.5" style={{ fontSize: "7px" }}>提出期限（出題日から何日後？）</p>
+            <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2 border-2 border-black">
+              <button
+                onClick={() => setDueDaysOffset((v) => Math.max(0, v - 1))}
+                className="w-8 h-8 rounded-lg border-2 border-black bg-white font-bold text-lg flex items-center justify-center hover:bg-gray-100 flex-shrink-0"
+              >−</button>
+              <div className="flex-1 text-center">
+                <p className="text-xl font-bold text-black">{dueDaysOffset}<span className="text-sm ml-0.5">日後</span></p>
+                <p className="text-xs text-gray-400">{DAY_LABELS[nextDue.getDay()]}曜日が期限</p>
+              </div>
+              <button
+                onClick={() => setDueDaysOffset((v) => Math.min(30, v + 1))}
+                className="w-8 h-8 rounded-lg border-2 border-black bg-white font-bold text-lg flex items-center justify-center hover:bg-gray-100 flex-shrink-0"
+              >+</button>
+            </div>
+          </div>
+          <div>
+            <p className="font-pixel text-gray-500 mb-1.5" style={{ fontSize: "7px" }}>周期</p>
+            <div className="flex gap-2">
+              {[{ label: "毎週", val: 1 }, { label: "2週ごと", val: 2 }].map(({ label, val }) => (
+                <button
+                  key={val}
+                  onClick={() => setIntervalWeeks(val)}
+                  className={`flex-1 py-2 rounded-xl border-2 text-sm font-semibold transition-colors ${intervalWeeks === val ? "bg-black text-[#c8f135] border-black" : "bg-white text-black border-black hover:bg-gray-100"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="font-pixel text-gray-500 mb-1.5" style={{ fontSize: "7px" }}>締め切り時刻</p>
+            <input
+              type="time"
+              value={dueTime}
+              onChange={(e) => setDueTime(e.target.value)}
+              className="w-full border-2 border-black rounded-xl px-3 py-2 text-sm focus:outline-none"
+            />
+          </div>
+          <div className="bg-gray-50 rounded-xl px-3 py-2.5 border-2 border-black space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="font-pixel text-gray-400" style={{ fontSize: "6px" }}>出題</span>
+              <span className="text-xs font-semibold text-gray-600">{assignedLabel}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="font-pixel text-[#ff6b6b]" style={{ fontSize: "6px" }}>期限</span>
+              <span className="text-xs font-bold text-black">{dueLabel} {dueTime}</span>
+            </div>
+          </div>
+          {errorMsg && <p className="text-xs text-red-500 font-semibold">{errorMsg}</p>}
+        </div>
+        <div className="flex gap-3 mt-5">
+          <button onClick={onClose} className="flex-1 border-2 border-black py-2 rounded-xl text-sm font-semibold hover:bg-gray-100">
+            キャンセル
+          </button>
+          <button
+            onClick={save}
+            disabled={saving || !title.trim()}
+            className="flex-1 border-2 border-black py-2 rounded-xl text-sm font-semibold bg-black text-[#c8f135] hover:opacity-90 disabled:opacity-40"
+          >
+            {saving ? "..." : "追加"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- 繰り返し課題行 ----
+function RecurringAssignmentRow({ recurring, onDelete, onToggle }: {
+  recurring: RecurringAssignment;
+  onDelete: () => void;
+  onToggle: (active: boolean) => void;
+}) {
+  const intervalLabel = recurring.interval_weeks === 1 ? "毎週" : "2週ごと";
+  const assignedDayLabel = DAY_LABELS[recurring.day_of_week] ?? "?";
+  const dueDayLabel = offsetLabel(recurring.due_days_offset);
+
+  return (
+    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-dashed border-black mb-1.5 ${recurring.active ? "bg-white" : "bg-gray-50 opacity-60"}`}>
+      <span className="text-sm">🔄</span>
+      <div className="flex-1 min-w-0">
+        <p className={`text-xs font-semibold truncate ${recurring.active ? "text-black" : "text-gray-400"}`}>{recurring.title}</p>
+        <p className="font-pixel text-gray-400" style={{ fontSize: "6px" }}>
+          {intervalLabel}{assignedDayLabel}曜日出題 → {dueDayLabel}期限 {recurring.due_time !== "23:59" ? recurring.due_time : ""}
+        </p>
+      </div>
+      <button
+        onClick={() => onToggle(!recurring.active)}
+        className={`w-7 h-4 rounded-full border-2 border-black flex-shrink-0 transition-colors ${recurring.active ? "bg-[#c8f135]" : "bg-gray-200"}`}
+      />
+      <button onClick={onDelete} className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0">
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+// ---- カスタム授業カード ----
+function CustomCourseCard({ course, pendingCount, onOpen, onDelete }: {
+  course: CustomCourse;
+  pendingCount: number;
+  onOpen: () => void;
+  onDelete: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    if (menuOpen) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
+
+  return (
+    <div className="rounded-2xl p-4 mb-3 bg-white border-dashed border-2 border-black shadow-[4px_4px_0px_#1a1a1a] transition-all hover:shadow-[2px_2px_0px_#1a1a1a] hover:translate-x-0.5 hover:translate-y-0.5">
+      <div className="flex items-center justify-between">
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={onOpen}>
+          <p className="font-semibold text-black truncate text-sm">{course.name}</p>
+          <div className="flex items-center gap-2 mt-1.5">
+            {pendingCount > 0 ? (
+              <span className="font-pixel" style={{ fontSize: "7px", background: "#ffb3d9", color: "#1a1a1a", padding: "2px 8px", borderRadius: "999px" }}>
+                {pendingCount} TODO
+              </span>
+            ) : (
+              <span className="font-pixel text-gray-400" style={{ fontSize: "7px" }}>· ALL DONE ·</span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+              className="p-1.5 rounded-lg border-2 border-black bg-white hover:bg-gray-100 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="black" viewBox="0 0 24 24">
+                <circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" />
+              </svg>
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-10 w-36 bg-white border-2 border-black rounded-xl shadow-[4px_4px_0px_#1a1a1a] z-10 py-1 overflow-hidden">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(); }}
+                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-50"
+                >
+                  削除する
+                </button>
+              </div>
+            )}
+          </div>
+          <button onClick={onOpen} className="p-1.5 rounded-lg border-2 border-black bg-white hover:bg-[#c8f135] transition-colors">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="black" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ---- 課題カード ----
@@ -166,8 +671,16 @@ function AssignmentCard({ assignment }: { assignment: Assignment }) {
 }
 
 // ---- セクション ----
-function Section({ title, assignments, defaultOpen = true }: { title: string; assignments: Assignment[]; defaultOpen?: boolean }) {
+function Section({ title, assignments, customAssignments = [], onToggleCustom, onDeleteCustom, defaultOpen = true }: {
+  title: string;
+  assignments: Assignment[];
+  customAssignments?: CustomAssignment[];
+  onToggleCustom?: (id: string) => void;
+  onDeleteCustom?: (id: string) => void;
+  defaultOpen?: boolean;
+}) {
   const [open, setOpen] = useState(defaultOpen);
+  const total = assignments.length + customAssignments.length;
   return (
     <div className="mb-5">
       <button
@@ -175,14 +688,24 @@ function Section({ title, assignments, defaultOpen = true }: { title: string; as
         className="flex items-center gap-2 w-full text-left mb-3 group"
       >
         <span className="font-pixel text-black" style={{ fontSize: "9px" }}>{title.toUpperCase()}</span>
-        <span className="text-xs bg-black text-[#c8f135] px-2 py-0.5 rounded-full font-pixel" style={{ fontSize: "7px" }}>{assignments.length}</span>
+        <span className="text-xs bg-black text-[#c8f135] px-2 py-0.5 rounded-full font-pixel" style={{ fontSize: "7px" }}>{total}</span>
         <span className="ml-auto text-gray-400 text-xs">{open ? "▲" : "▼"}</span>
       </button>
       {open && (
-        assignments.length === 0 ? (
+        total === 0 ? (
           <p className="text-xs text-gray-400 pl-2 font-pixel" style={{ fontSize: "8px" }}>· NO TASKS ·</p>
         ) : (
-          assignments.map((a) => <AssignmentCard key={a.id} assignment={a} />)
+          <>
+            {assignments.map((a) => <AssignmentCard key={a.id} assignment={a} />)}
+            {customAssignments.map((a) => (
+              <CustomAssignmentCard
+                key={a.id}
+                assignment={a}
+                onToggle={() => onToggleCustom?.(a.id)}
+                onDelete={() => onDeleteCustom?.(a.id)}
+              />
+            ))}
+          </>
         )
       )}
     </div>
@@ -441,6 +964,13 @@ export default function Home() {
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [hideTarget, setHideTarget] = useState<Course | null>(null);
+  const [customAssignments, setCustomAssignments] = useState<CustomAssignment[]>([]);
+  const [customCourses, setCustomCourses] = useState<CustomCourse[]>([]);
+  const [recurringAssignments, setRecurringAssignments] = useState<RecurringAssignment[]>([]);
+  const [showAddCourseModal, setShowAddCourseModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddRecurringModal, setShowAddRecurringModal] = useState(false);
+  const [selectedCustomCourseId, setSelectedCustomCourseId] = useState<string | null>(null);
 
   useEffect(() => {
     const accessToken = (session as any)?.accessToken;
@@ -449,7 +979,10 @@ export default function Home() {
       Promise.all([
         fetch("/api/classroom").then((r) => r.json()),
         fetch("/api/settings").then((r) => r.json()),
-      ]).then(([classroomData, settingsData]) => {
+        fetch("/api/custom-assignments").then((r) => r.json()),
+        fetch("/api/custom-courses").then((r) => r.json()),
+        fetch("/api/recurring-assignments").then((r) => r.json()),
+      ]).then(([classroomData, settingsData, customData, coursesData, recurringData]) => {
         if (classroomData.noDue) setData(classroomData);
         setSettings({
           reminder_minutes: settingsData.reminder_minutes ?? 60,
@@ -458,10 +991,93 @@ export default function Home() {
           notify_announcements: settingsData.notify_announcements ?? true,
           notify_materials: settingsData.notify_materials ?? true,
         });
+        if (Array.isArray(customData)) setCustomAssignments(customData);
+        if (Array.isArray(coursesData)) setCustomCourses(coursesData);
+        if (Array.isArray(recurringData)) setRecurringAssignments(recurringData);
         setLoading(false);
       });
     }
   }, [(session as any)?.accessToken]);
+
+  const toggleCustomSubmit = async (id: string) => {
+    const target = customAssignments.find((a) => a.id === id);
+    if (!target) return;
+    const updated = customAssignments.map((a) => a.id === id ? { ...a, submitted: !a.submitted } : a);
+    setCustomAssignments(updated);
+    await fetch("/api/custom-assignments", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, submitted: !target.submitted }),
+    });
+  };
+
+  const deleteCustomAssignment = async (id: string) => {
+    setCustomAssignments((prev) => prev.filter((a) => a.id !== id));
+    await fetch("/api/custom-assignments", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+  };
+
+  const deleteRecurringAssignment = async (id: string) => {
+    setRecurringAssignments((prev) => prev.filter((r) => r.id !== id));
+    await fetch("/api/recurring-assignments", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+  };
+
+  const toggleRecurringActive = async (id: string, active: boolean) => {
+    setRecurringAssignments((prev) => prev.map((r) => r.id === id ? { ...r, active } : r));
+    await fetch("/api/recurring-assignments", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, active }),
+    });
+  };
+
+  const deleteCustomCourse = async (id: string) => {
+    setCustomCourses((prev) => prev.filter((c) => c.id !== id));
+    const course = customCourses.find((c) => c.id === id);
+    if (course) {
+      setCustomAssignments((prev) => prev.filter((a) => a.course_name !== course.name));
+      setRecurringAssignments((prev) => prev.filter((r) => r.course_name !== course.name));
+    }
+    await fetch("/api/custom-courses", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+  };
+
+  const selectedCustomCourse = customCourses.find((c) => c.id === selectedCustomCourseId);
+  const getCustomCoursePendingCount = (courseName: string) =>
+    customAssignments.filter((a) => a.course_name === courseName && !a.submitted).length;
+
+  const getCustomForSection = (section: "noDue" | "thisWeek" | "nextWeek" | "later") => {
+    const now = new Date();
+    const endOfThisWeek = new Date();
+    const daysUntilSat = (6 - now.getDay() + 7) % 7;
+    endOfThisWeek.setDate(now.getDate() + daysUntilSat);
+    endOfThisWeek.setHours(23, 59, 59);
+    const endOfNextWeek = new Date(endOfThisWeek);
+    endOfNextWeek.setDate(endOfThisWeek.getDate() + 7);
+
+    return customAssignments.filter((a) => {
+      if (!a.due_date) return section === "noDue";
+      const due = new Date(a.due_date);
+      if (due < new Date(now.getFullYear(), now.getMonth(), now.getDate())) return false;
+      if (section === "thisWeek") return due <= endOfThisWeek;
+      if (section === "nextWeek") return due > endOfThisWeek && due <= endOfNextWeek;
+      if (section === "later") return due > endOfNextWeek;
+      return false;
+    }).sort((a, b) => {
+      if (a.submitted === b.submitted) return 0;
+      return a.submitted ? 1 : -1;
+    });
+  };
 
   const saveSettings = useCallback(async (patch: Partial<UserSettings>) => {
     const updated = { ...settings, ...patch };
@@ -529,6 +1145,22 @@ export default function Home() {
     <>
       {hideTarget && <HideConfirmDialog courseName={hideTarget.name} onConfirm={confirmHide} onCancel={() => setHideTarget(null)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} courses={data?.courses ?? []} settings={settings} onSave={saveSettings} />}
+      {showAddModal && (
+        <AddCustomAssignmentModal
+          onClose={() => setShowAddModal(false)}
+          onAdd={(a) => setCustomAssignments((prev) => [a, ...prev])}
+          defaultCourseName={selectedCustomCourse?.name}
+        />
+      )}
+      {showAddCourseModal && <AddCustomCourseModal onClose={() => setShowAddCourseModal(false)} onAdd={(c) => setCustomCourses((prev) => [c, ...prev])} />}
+      {showAddRecurringModal && (
+        <AddRecurringAssignmentModal
+          onClose={() => setShowAddRecurringModal(false)}
+          onAdd={(r) => setRecurringAssignments((prev) => [r, ...prev])}
+          onAddAssignments={(assignments) => setCustomAssignments((prev) => [...assignments, ...prev])}
+          defaultCourseName={selectedCustomCourse?.name}
+        />
+      )}
 
       <div className="max-w-2xl mx-auto p-6">
         {/* ヘッダー */}
@@ -585,40 +1217,130 @@ export default function Home() {
           <>
             {activeTab === "courses" && (
               <div>
-                {visibleCourses.length === 0 ? (
+                {visibleCourses.map((course) => (
+                  <CourseCard
+                    key={course.id} course={course}
+                    pendingCount={getPendingCount(course.id)}
+                    onOpen={() => { setSelectedCourseId(course.id); setSelectedCustomCourseId(null); setActiveTab("assignments"); }}
+                    perCourseNotify={settings.per_course_notify}
+                    notifyEnabled={isNotifyEnabled(course.id)}
+                    onToggleNotify={() => toggleCourseNotify(course.id)}
+                    onHide={() => setHideTarget(course)}
+                  />
+                ))}
+                {customCourses.map((course) => (
+                  <CustomCourseCard
+                    key={course.id}
+                    course={course}
+                    pendingCount={getCustomCoursePendingCount(course.name)}
+                    onOpen={() => { setSelectedCustomCourseId(course.id); setSelectedCourseId(null); setActiveTab("assignments"); }}
+                    onDelete={() => deleteCustomCourse(course.id)}
+                  />
+                ))}
+                {visibleCourses.length === 0 && customCourses.length === 0 && (
                   <p className="font-pixel text-gray-400 text-center py-10" style={{ fontSize: "8px" }}>· NO COURSES ·</p>
-                ) : (
-                  visibleCourses.map((course) => (
-                    <CourseCard
-                      key={course.id} course={course}
-                      pendingCount={getPendingCount(course.id)}
-                      onOpen={() => { setSelectedCourseId(course.id); setActiveTab("assignments"); }}
-                      perCourseNotify={settings.per_course_notify}
-                      notifyEnabled={isNotifyEnabled(course.id)}
-                      onToggleNotify={() => toggleCourseNotify(course.id)}
-                      onHide={() => setHideTarget(course)}
-                    />
-                  ))
                 )}
+                <button
+                  onClick={() => setShowAddCourseModal(true)}
+                  className="w-full mt-2 py-3 rounded-2xl border-dashed border-2 border-black text-sm font-semibold text-gray-400 hover:bg-white hover:text-black transition-colors"
+                >
+                  + 授業を追加
+                </button>
               </div>
             )}
 
             {activeTab === "assignments" && (
               <div>
-                {selectedCourse && (
-                  <div className="flex items-center gap-2 mb-4 bg-white border-2 border-black rounded-xl px-4 py-2.5 shadow-[3px_3px_0px_#1a1a1a]">
-                    <span className="text-sm font-semibold text-black truncate flex-1">{selectedCourse.name}</span>
-                    <button onClick={() => setSelectedCourseId(null)}
-                      className="text-xs font-pixel text-gray-400 hover:text-black flex-shrink-0 transition-colors"
-                      style={{ fontSize: "7px" }}>
-                      ✕ ALL
-                    </button>
-                  </div>
+                {selectedCustomCourse ? (
+                  <>
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="flex items-center gap-2 flex-1 bg-white border-dashed border-2 border-black rounded-xl px-4 py-2.5 shadow-[3px_3px_0px_#1a1a1a]">
+                        <span className="text-sm font-semibold text-black truncate flex-1">{selectedCustomCourse.name}</span>
+                        <button onClick={() => { setSelectedCustomCourseId(null); setActiveTab("courses"); }}
+                          className="text-xs font-pixel text-gray-400 hover:text-black flex-shrink-0 transition-colors"
+                          style={{ fontSize: "7px" }}>
+                          ✕ 戻る
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => setShowAddModal(true)}
+                        className="w-10 h-10 flex items-center justify-center rounded-xl border-2 border-black bg-black text-[#c8f135] shadow-[3px_3px_0px_#1a1a1a] hover:shadow-[1px_1px_0px_#1a1a1a] hover:translate-x-0.5 hover:translate-y-0.5 transition-all font-bold text-lg flex-shrink-0"
+                      >
+                        +
+                      </button>
+                    </div>
+                    {/* 繰り返し課題セクション */}
+                    {(() => {
+                      const recurringForCourse = recurringAssignments.filter((r) => r.course_name === selectedCustomCourse.name);
+                      return (
+                        <div className="mb-4">
+                          {recurringForCourse.length > 0 && (
+                            <div className="mb-2">
+                              <p className="font-pixel text-gray-400 mb-1.5" style={{ fontSize: "6px" }}>· RECURRING ·</p>
+                              {recurringForCourse.map((r) => (
+                                <RecurringAssignmentRow
+                                  key={r.id}
+                                  recurring={r}
+                                  onDelete={() => deleteRecurringAssignment(r.id)}
+                                  onToggle={(active) => toggleRecurringActive(r.id, active)}
+                                />
+                              ))}
+                            </div>
+                          )}
+                          <button
+                            onClick={() => setShowAddRecurringModal(true)}
+                            className="w-full py-2 rounded-xl border-dashed border-2 border-black text-xs font-semibold text-gray-400 hover:bg-white hover:text-black transition-colors flex items-center justify-center gap-1.5"
+                          >
+                            <span>🔄</span> 繰り返し課題を設定
+                          </button>
+                        </div>
+                      );
+                    })()}
+                    {(["noDue", "thisWeek", "nextWeek", "later"] as const).map((section, i) => {
+                      const labels = ["期限なし", "今週", "次の週", "それ以降"];
+                      const customItems = getCustomForSection(section).filter((a) => a.course_name === selectedCustomCourse.name);
+                      return (
+                        <Section key={section} title={labels[i]} assignments={[]}
+                          customAssignments={customItems}
+                          onToggleCustom={toggleCustomSubmit}
+                          onDeleteCustom={deleteCustomAssignment}
+                          defaultOpen={section !== "later"}
+                        />
+                      );
+                    })}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 mb-4">
+                      {selectedCourse ? (
+                        <div className="flex items-center gap-2 flex-1 bg-white border-2 border-black rounded-xl px-4 py-2.5 shadow-[3px_3px_0px_#1a1a1a]">
+                          <span className="text-sm font-semibold text-black truncate flex-1">{selectedCourse.name}</span>
+                          <button onClick={() => setSelectedCourseId(null)}
+                            className="text-xs font-pixel text-gray-400 hover:text-black flex-shrink-0 transition-colors"
+                            style={{ fontSize: "7px" }}>
+                            ✕ ALL
+                          </button>
+                        </div>
+                      ) : <div className="flex-1" />}
+                    </div>
+                    {(["noDue", "thisWeek", "nextWeek", "later"] as const).map((section, i) => {
+                      const labels = ["期限なし", "今週", "次の週", "それ以降"];
+                      const classroomItems = filterByCourse(data[section]);
+                      const customItems = selectedCourseId ? [] : getCustomForSection(section).filter((a) =>
+                        !customCourses.some((c) => c.name === a.course_name)
+                      );
+                      return (
+                        <Section key={section} title={labels[i]}
+                          assignments={classroomItems}
+                          customAssignments={customItems}
+                          onToggleCustom={toggleCustomSubmit}
+                          onDeleteCustom={deleteCustomAssignment}
+                          defaultOpen={section !== "later"}
+                        />
+                      );
+                    })}
+                  </>
                 )}
-                <Section title="期限なし" assignments={filterByCourse(data.noDue)} />
-                <Section title="今週" assignments={filterByCourse(data.thisWeek)} />
-                <Section title="次の週" assignments={filterByCourse(data.nextWeek)} />
-                <Section title="それ以降" assignments={filterByCourse(data.later)} defaultOpen={false} />
               </div>
             )}
           </>
