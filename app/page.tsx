@@ -298,7 +298,8 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
-    if (session) {
+    const accessToken = (session as any)?.accessToken;
+    if (session && accessToken) {
       setLoading(true);
       fetch("/api/classroom")
         .then((res) => res.json())
@@ -307,7 +308,7 @@ export default function Home() {
           setLoading(false);
         });
     }
-  }, [session]);
+  }, [(session as any)?.accessToken]);
 
   const allAssignments = data
     ? [...data.noDue, ...data.thisWeek, ...data.nextWeek, ...data.later]
