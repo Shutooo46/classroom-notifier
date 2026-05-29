@@ -339,11 +339,17 @@ app.post("/process-custom-reminder", async (req, res) => {
       ? new Date(assignment.due_date + "T14:59:00Z").toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", weekday: "short" })
       : "期限なし";
 
-    const isUrgent = reminderType === "reminder";
-    const title = isUrgent
-      ? `🚨 カスタム課題 - あと${reminderMinutes}分！`
-      : "⏰ カスタム課題 - 24時間前リマインド";
-    const color = isUrgent ? 0xff6b6b : 0xffa500;
+    let title, color;
+    if (reminderType === "new") {
+      title = "🔄 繰り返し課題が出題されました";
+      color = 0x4285f4;
+    } else if (reminderType === "reminder") {
+      title = `🚨 カスタム課題 - あと${reminderMinutes}分！`;
+      color = 0xff6b6b;
+    } else {
+      title = "⏰ カスタム課題 - 24時間前リマインド";
+      color = 0xffa500;
+    }
 
     await fetch(process.env.DISCORD_WEBHOOK_URL, {
       method: "POST",
@@ -355,7 +361,7 @@ app.post("/process-custom-reminder", async (req, res) => {
           fields: [
             { name: "課題", value: assignment.title, inline: false },
             { name: "授業", value: assignment.course_name, inline: false },
-            { name: "期限", value: dueDateStr, inline: false },
+            { name: "期限", value: `${dueDateStr} ${assignment.due_time ?? "23:59"}`, inline: false },
           ],
         }]
       }),

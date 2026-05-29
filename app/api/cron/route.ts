@@ -1,23 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
-function getNextOccurrences(from: Date, dayOfWeek: number, intervalWeeks: number, count: number): Date[] {
-  const dates: Date[] = [];
-  const fromDay = from.getDay();
-  const daysUntilFirst = (dayOfWeek - fromDay + 7) % 7;
-
-  const firstDate = new Date(from);
-  firstDate.setDate(from.getDate() + daysUntilFirst);
-  firstDate.setHours(0, 0, 0, 0);
-
-  for (let i = 0; i < count; i++) {
-    const date = new Date(firstDate);
-    date.setDate(firstDate.getDate() + i * intervalWeeks * 7);
-    dates.push(date);
-  }
-  return dates;
-}
-
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -242,7 +225,7 @@ export async function GET(request: Request) {
       }
     }
 
-    // ---- 繰り返し課題の自動生成 ----
+    // ---- 繰り返し課題の自動生成（出題曜日当日に1件生成 + 新着通知） ----
     const { data: recurringTemplates } = await supabase
       .from("recurring_assignments")
       .select("*")
@@ -250,31 +233,77 @@ export async function GET(request: Request) {
       .eq("active", true);
 
     if (recurringTemplates && recurringTemplates.length > 0) {
-      const now = new Date();
-      for (const template of recurringTemplates) {
-        const occurrences = getNextOccurrences(now, template.day_of_week, template.interval_weeks, 3);
-        for (const assignedDate of occurrences) {
-          const dueDate = new Date(assignedDate);
-          dueDate.setDate(assignedDate.getDate() + (template.due_days_offset ?? 0));
-          const dueDateStr = dueDate.toISOString().split("T")[0];
-          const { data: existing } = await supabase
-            .from("custom_assignments")
-            .select("id")
-            .eq("user_id", user.user_id)
-            .eq("title", template.title)
-            .eq("course_name", template.course_name)
-            .eq("due_date", dueDateStr)
-            .single();
+      // JST の今日の曜日・日付を取得
+      const nowJST = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
+      const todayDayOfWeek = nowJST.getUTCDay();
 
-          if (!existing) {
-            await supabase.from("custom_assignments").insert({
+      for (const template of recurringTemplates) {
+        // 出題曜日が今日でなければスキップ（intervalWeeks=2 の場合は週の判定が必要）
+        if (todayDayOfWeek !== template.day_of_week) continue;
+
+        // 2週ごとの場合、今週が出題週かチェック（epoch からの週数で判定）
+        if (template.interval_weeks === 2) {
+          const epochWeek = Math.floor(nowJST.getTime() / (7 * 24 * 60 * 60 * 1000));
+          const createdWeek = Math.floor(new Date(template.created_at).getTime() / (7 * 24 * 60 * 60 * 1000));
+          if ((epochWeek - createdWeek) % 2 !== 0) continue;
+        }
+
+        const dueDateJST = new Date(nowJST);
+        dueDateJST.setUTCDate(nowJST.getUTCDate() + (template.due_days_offset ?? 0));
+        const dueDateStr = dueDateJST.toISOString().split("T")[0];
+
+        const { data: existing } = await supabase
+          .from("custom_assignments")
+          .select("id")
+          .eq("user_id", user.user_id)
+          .eq("title", template.title)
+          .eq("course_name", template.course_name)
+          .eq("due_date", dueDateStr)
+          .single();
+
+        let assignmentId = existing?.id;
+        if (!existing) {
+          const { data: newA } = await supabase
+            .from("custom_assignments")
+            .insert({
               user_id: user.user_id,
               title: template.title,
               course_name: template.course_name,
               due_date: dueDateStr,
               due_time: template.due_time ?? "23:59",
-            });
-          }
+            })
+            .select("id")
+            .single();
+          assignmentId = newA?.id;
+        }
+
+        if (!assignmentId) continue;
+
+        // 新着通知（まだ送っていなければ）
+        const { data: existingNotif } = await supabase
+          .from("notified_assignments")
+          .select("id")
+          .eq("assignment_id", assignmentId)
+          .eq("user_id", user.user_id)
+          .eq("notification_type", "custom_new")
+          .single();
+
+        if (!existingNotif) {
+          await supabase.from("notified_assignments").insert({
+            assignment_id: assignmentId,
+            user_id: user.user_id,
+            notified_at: new Date().toISOString(),
+            notification_type: "custom_new",
+          });
+
+          fetch(`${process.env.CLOUD_RUN_URL}/process-custom-reminder`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              assignment: { id: assignmentId, title: template.title, course_name: template.course_name, due_date: dueDateStr, due_time: template.due_time ?? "23:59" },
+              reminderType: "new",
+            }),
+          }).catch((e) => console.error("Cloud Run recurring new error:", e));
         }
       }
     }

@@ -59,7 +59,7 @@ export async function POST(request: Request) {
   if (!data) return NextResponse.json({ error: "No data returned" }, { status: 500 });
 
   // 作成時に次の3回分の custom_assignments を即生成
-  const occurrences = getNextOccurrences(new Date(), day_of_week, iWeeks, 3);
+  const occurrences = getNextOccurrences(new Date(), day_of_week, iWeeks, 1);
   const generatedAssignments = [];
   for (const assignedDate of occurrences) {
     const dueDate = new Date(assignedDate);
