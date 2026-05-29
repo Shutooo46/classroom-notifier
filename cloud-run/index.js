@@ -163,7 +163,7 @@ app.post("/process", async (req, res) => {
       (assignment.dueDate?.month ?? new Date().getMonth() + 1) - 1,
       assignment.dueDate?.day ?? new Date().getDate(),
       assignment.dueTime?.hours ?? 23,
-      assignment.dueTime?.minutes ?? 59
+      assignment.dueTime != null ? (assignment.dueTime.minutes ?? 0) : 59
     ));
 
     await fetch(process.env.DISCORD_WEBHOOK_URL, {
