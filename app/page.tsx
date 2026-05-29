@@ -1127,7 +1127,7 @@ function SettingsModal({ onClose, courses, settings, onSave }: {
               <div>
                 <p className="text-sm font-semibold text-black">Discord DM通知</p>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  {settings.discord_user_id ? "連携済み ✓" : "未連携"}
+                  {settings.discord_user_id ? <span>連携済み <span className="text-[#c8f135]">✓</span></span> : "未連携"}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -1198,6 +1198,7 @@ export default function Home() {
   const [customCourses, setCustomCourses] = useState<CustomCourse[]>([]);
   const [recurringAssignments, setRecurringAssignments] = useState<RecurringAssignment[]>([]);
   const [showAddCourseModal, setShowAddCourseModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAddRecurringModal, setShowAddRecurringModal] = useState(false);
   const [editingRecurring, setEditingRecurring] = useState<RecurringAssignment | null>(null);
@@ -1330,6 +1331,18 @@ export default function Home() {
       return a.submitted ? 1 : -1;
     });
   };
+
+  const applySearch = (assignments: Assignment[]) => {
+    if (!searchQuery) return assignments;
+    const q = searchQuery.toLowerCase();
+    return assignments.filter((a) => a.title.toLowerCase().includes(q) || a.courseName.toLowerCase().includes(q));
+  };
+
+  const applySearchCustom = (assignments: CustomAssignment[]) => {
+    if (!searchQuery) return assignments;
+    const q = searchQuery.toLowerCase();
+    return assignments.filter((a) => a.title.toLowerCase().includes(q) || a.course_name.toLowerCase().includes(q));
+  };
   const selectedCourse = data?.courses.find((c) => c.id === selectedCourseId);
 
   const visibleCourses = (data?.courses ?? [])
@@ -1450,7 +1463,7 @@ export default function Home() {
           {(["courses", "assignments"] as const).map((tab) => (
             <button
               key={tab}
-              onClick={() => { setActiveTab(tab); if (tab === "assignments") setSelectedCourseId(null); }}
+              onClick={() => { setActiveTab(tab); if (tab === "assignments") setSelectedCourseId(null); setSearchQuery(""); }}
               className={`flex-1 py-2.5 rounded-xl border-2 border-black font-pixel transition-all ${
                 activeTab === tab
                   ? "bg-black text-[#c8f135] shadow-[3px_3px_0px_#555]"
@@ -1567,9 +1580,9 @@ export default function Home() {
                   </>
                 ) : (
                   <>
-                    <div className="flex items-center gap-2 mb-4">
-                      {selectedCourse ? (
-                        <div className="flex items-center gap-2 flex-1 bg-white border-2 border-black rounded-xl px-4 py-2.5 shadow-[3px_3px_0px_#1a1a1a]">
+                    <div className="flex flex-col gap-2 mb-4">
+                      {selectedCourse && (
+                        <div className="flex items-center gap-2 bg-white border-2 border-black rounded-xl px-4 py-2.5 shadow-[3px_3px_0px_#1a1a1a]">
                           <span className="text-sm font-semibold text-black truncate flex-1">{selectedCourse.name}</span>
                           <button onClick={() => setSelectedCourseId(null)}
                             className="text-xs font-pixel text-gray-400 hover:text-black flex-shrink-0 transition-colors"
@@ -1577,12 +1590,27 @@ export default function Home() {
                             ✕ ALL
                           </button>
                         </div>
-                      ) : <div className="flex-1" />}
+                      )}
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="課題・コース名で検索..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="w-full bg-white border-2 border-black rounded-xl px-4 py-2.5 text-sm focus:outline-none shadow-[3px_3px_0px_#1a1a1a] pr-8"
+                        />
+                        {searchQuery && (
+                          <button onClick={() => setSearchQuery("")}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black text-xs">
+                            ✕
+                          </button>
+                        )}
+                      </div>
                     </div>
                     {(["noDue", "thisWeek", "nextWeek", "later"] as const).map((section, i) => {
                       const labels = ["期限なし", "今週", "次の週", "それ以降"];
-                      const classroomItems = filterByCourse(data[section]);
-                      const customItems = selectedCourseId ? [] : getCustomForSection(section);
+                      const classroomItems = applySearch(filterByCourse(data[section]));
+                      const customItems = applySearchCustom(selectedCourseId ? [] : getCustomForSection(section));
                       return (
                         <Section key={section} title={labels[i]}
                           assignments={classroomItems}
