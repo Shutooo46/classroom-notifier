@@ -1,12 +1,10 @@
 const express = require("express");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const { Client } = require("@upstash/qstash");
 
 const app = express();
 app.use(express.json());
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const qstash = new Client({ token: process.env.QSTASH_TOKEN });
 
 
 let isProcessing = false;
@@ -150,7 +148,7 @@ async function summarizeAssignment(title, description, driveFileIds = [], access
 }
 
 app.post("/process", async (req, res) => {
-  const { assignment, course, user_id, reminderMinutes, accessToken, driveFileIds } = req.body;
+  const { assignment, course, accessToken, driveFileIds } = req.body;
 
   try {
     const summary = await summarizeAssignment(
@@ -185,75 +183,55 @@ app.post("/process", async (req, res) => {
       }),
     });
 
-    if (assignment.dueDate) {
-      const notify24h = new Date(due.getTime() - 24 * 60 * 60 * 1000);
-      const notifyReminder = new Date(due.getTime() - reminderMinutes * 60 * 1000);
-      const now = new Date();
-      const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    res.json({ message: "Done" });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e) });
+  }
+});
 
-      if (notify24h > now && notify24h < sevenDaysLater) {
-        await qstash.publishJSON({
-          url: `${process.env.NEXTAUTH_URL}/api/notify`,
-          notBefore: Math.floor(notify24h.getTime() / 1000),
-          body: {
-            assignment_id: assignment.id,
-            user_id,
-            notification_type: "24h",
-            assignment_title: assignment.title,
-            course_name: course.name,
-            due: due.toISOString(),
-          },
-        });
-      } else if (due > now && notify24h <= now) {
-        await fetch(process.env.DISCORD_WEBHOOK_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            embeds: [{
-              title: "⏰ 期限まで24時間を切りました！",
-              color: 0xff6600,
-              fields: [
-                { name: "課題", value: assignment.title, inline: false },
-                { name: "コース", value: course.name, inline: false },
-                { name: "期限", value: due.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }), inline: false },
-              ]
-            }]
-          }),
-        });
-      }
+app.post("/process-classroom-reminder", async (req, res) => {
+  const { assignment_title, course_name, due, notification_type } = req.body;
 
-      if (notifyReminder > now && notifyReminder < sevenDaysLater) {
-        await qstash.publishJSON({
-          url: `${process.env.NEXTAUTH_URL}/api/notify`,
-          notBefore: Math.floor(notifyReminder.getTime() / 1000),
-          body: {
-            assignment_id: assignment.id,
-            user_id,
-            notification_type: "reminder",
-            assignment_title: assignment.title,
-            course_name: course.name,
-            due: due.toISOString(),
-            reminder_minutes: reminderMinutes,
-          },
-        });
-      } else if (due > now && notifyReminder <= now) {
-        await fetch(process.env.DISCORD_WEBHOOK_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            embeds: [{
-              title: "🚨 期限まであと少し！まだ未提出です！",
-              color: 0xff0000,
-              fields: [
-                { name: "課題", value: assignment.title, inline: false },
-                { name: "コース", value: course.name, inline: false },
-                { name: "期限", value: due.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }), inline: false },
-                { name: "残り時間", value: `約${Math.ceil((due.getTime() - now.getTime()) / (1000 * 60))}分`, inline: false },
-              ]
-            }]
-          }),
-        });
-      }
+  try {
+    const dueDate = new Date(due);
+
+    if (notification_type === "24h") {
+      await fetch(process.env.DISCORD_WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          embeds: [{
+            title: "⏰ 期限まで24時間を切りました！",
+            color: 0xff6600,
+            fields: [
+              { name: "課題", value: assignment_title, inline: false },
+              { name: "コース", value: course_name, inline: false },
+              { name: "期限", value: dueDate.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }), inline: false },
+            ]
+          }]
+        }),
+      });
+    } else if (notification_type === "reminder") {
+      const diffMs = dueDate.getTime() - Date.now();
+      const diffH = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffM = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      const remaining = diffH > 0 ? `${diffH}時間${diffM}分` : `${diffM}分`;
+      await fetch(process.env.DISCORD_WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          embeds: [{
+            title: `🚨 期限まであと${remaining}！`,
+            color: 0xff0000,
+            fields: [
+              { name: "課題", value: assignment_title, inline: false },
+              { name: "コース", value: course_name, inline: false },
+              { name: "期限", value: dueDate.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }), inline: false },
+            ]
+          }]
+        }),
+      });
     }
 
     res.json({ message: "Done" });

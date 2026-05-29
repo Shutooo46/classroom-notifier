@@ -135,6 +135,77 @@ export async function GET(request: Request) {
             }),
           }).catch((e) => console.error("Cloud Run error:", e));
         }
+
+        // 24時間前通知 & リマインド通知（cronが毎回チェック）
+        if (assignment.dueDate) {
+          const dueWithTime = new Date(Date.UTC(
+            assignment.dueDate.year,
+            assignment.dueDate.month - 1,
+            assignment.dueDate.day,
+            assignment.dueTime?.hours ?? 23,
+            assignment.dueTime?.minutes ?? 59
+          ));
+          const now = new Date();
+          const diffMinutes = (dueWithTime.getTime() - now.getTime()) / 60000;
+
+          if (diffMinutes > 0 && diffMinutes <= 24 * 60) {
+            const { data: existing24h } = await supabase
+              .from("notified_assignments")
+              .select("id")
+              .eq("assignment_id", assignment.id)
+              .eq("user_id", user.user_id)
+              .eq("notification_type", "24h")
+              .single();
+
+            if (!existing24h) {
+              await supabase.from("notified_assignments").insert({
+                assignment_id: assignment.id,
+                user_id: user.user_id,
+                notified_at: new Date().toISOString(),
+                notification_type: "24h",
+              });
+              fetch(`${process.env.CLOUD_RUN_URL}/process-classroom-reminder`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  assignment_title: assignment.title,
+                  course_name: course.name,
+                  due: dueWithTime.toISOString(),
+                  notification_type: "24h",
+                }),
+              }).catch((e) => console.error("Cloud Run 24h error:", e));
+            }
+          }
+
+          if (diffMinutes > 0 && diffMinutes <= reminderMinutes && reminderMinutes < 22 * 60) {
+            const { data: existingReminder } = await supabase
+              .from("notified_assignments")
+              .select("id")
+              .eq("assignment_id", assignment.id)
+              .eq("user_id", user.user_id)
+              .eq("notification_type", "reminder")
+              .single();
+
+            if (!existingReminder) {
+              await supabase.from("notified_assignments").insert({
+                assignment_id: assignment.id,
+                user_id: user.user_id,
+                notified_at: new Date().toISOString(),
+                notification_type: "reminder",
+              });
+              fetch(`${process.env.CLOUD_RUN_URL}/process-classroom-reminder`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  assignment_title: assignment.title,
+                  course_name: course.name,
+                  due: dueWithTime.toISOString(),
+                  notification_type: "reminder",
+                }),
+              }).catch((e) => console.error("Cloud Run reminder error:", e));
+            }
+          }
+        }
       }
 
       // お知らせ通知
