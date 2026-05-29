@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #efefef;
   --foreground: #1a1a1a;
@@ -22,6 +24,12 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), "DM Sans", Arial, sans-serif;
   min-height: 100vh;
+}
+
+html.dark body {
+  background-color: #1c1c1e;
+  background-image: radial-gradient(circle, #3a3a3a 1px, transparent 1px);
+  background-size: 20px 20px;
 }
 
 .font-pixel {
