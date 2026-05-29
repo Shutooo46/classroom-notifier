@@ -47,5 +47,14 @@ export async function POST(request: Request) {
     .from("user_settings")
     .upsert(updateData, { onConflict: "user_id" });
 
+  // リマインド時間が変更された場合、既存のリマインド通知履歴をリセットして次回cronで再評価
+  if (reminder_minutes !== undefined) {
+    await supabase
+      .from("notified_assignments")
+      .delete()
+      .eq("user_id", userId)
+      .in("notification_type", ["reminder", "custom_reminder"]);
+  }
+
   return NextResponse.json({ success: true });
 }
