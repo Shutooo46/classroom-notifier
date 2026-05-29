@@ -208,14 +208,14 @@ function AddCustomAssignmentModal({ onClose, onAdd, defaultCourseName }: {
             </div>
             {hasDue && (
               <div className="space-y-2">
-                <div className="flex items-center justify-center gap-3 bg-gray-50 rounded-2xl py-3 px-4 border-2 border-black">
+                <div className="flex items-center justify-center gap-3 bg-black rounded-2xl py-3 px-4 border-2 border-black">
                   <PickerColumn values={monthValues} selected={dueMonth} onChange={setDueMonth} label="月" />
-                  <span className="font-pixel text-gray-300 mb-6" style={{ fontSize: "16px" }}>/</span>
+                  <span className="font-pixel text-white mb-6" style={{ fontSize: "16px" }}>/</span>
                   <PickerColumn values={dayValues} selected={dueDay} onChange={setDueDay} label="日" />
                 </div>
-                <div className="flex items-center justify-center gap-3 bg-gray-50 rounded-2xl py-3 px-4 border-2 border-black">
+                <div className="flex items-center justify-center gap-3 bg-black rounded-2xl py-3 px-4 border-2 border-black">
                   <PickerColumn values={hourValues} selected={dueHour} onChange={setDueHour} label="時" />
-                  <span className="font-pixel text-gray-300 mb-6" style={{ fontSize: "20px" }}>:</span>
+                  <span className="font-pixel text-white mb-6" style={{ fontSize: "20px" }}>:</span>
                   <PickerColumn values={minValues} selected={dueMinute} onChange={setDueMinute} label="分" />
                 </div>
               </div>
@@ -503,9 +503,9 @@ function AddRecurringAssignmentModal({ onClose, onAdd, onAddAssignments, default
           </div>
           <div>
             <p className="font-pixel text-gray-500 mb-1.5" style={{ fontSize: "7px" }}>締め切り時刻</p>
-            <div className="flex items-center justify-center gap-3 bg-gray-50 rounded-2xl py-3 px-4 border-2 border-black">
+            <div className="flex items-center justify-center gap-3 bg-black rounded-2xl py-3 px-4 border-2 border-black">
               <PickerColumn values={hourValues} selected={dueHour} onChange={setDueHour} label="時" />
-              <span className="font-pixel text-gray-300 mb-6" style={{ fontSize: "20px" }}>:</span>
+              <span className="font-pixel text-white mb-6" style={{ fontSize: "20px" }}>:</span>
               <PickerColumn values={minValues} selected={dueMinute} onChange={setDueMinute} label="分" />
             </div>
           </div>
@@ -879,14 +879,14 @@ function PickerColumn({ values, selected, onChange, label }: {
 
   return (
     <div className="flex flex-col items-center">
-      <div className="relative w-20 h-[132px]">
+      <div className="relative w-20 h-[132px] bg-black rounded-xl overflow-hidden">
         <div className="absolute inset-x-0 top-[44px] h-[44px] bg-[#c8f135] rounded-lg pointer-events-none border-2 border-black" />
         <div ref={ref} onScroll={handleScroll} className="h-full overflow-y-scroll no-scrollbar"
           style={{ scrollSnapType: "y mandatory" }}>
           <div style={{ height: itemHeight }} />
           {values.map((v, i) => (
             <div key={i} style={{ height: itemHeight, scrollSnapAlign: "center", fontSize: "18px" }}
-              className={`relative z-20 flex items-center justify-center font-pixel transition-colors ${selected === i ? "text-black" : "text-gray-300"}`}>
+              className={`relative z-20 flex items-center justify-center font-pixel transition-colors ${selected === i ? "text-black" : "text-white"}`}>
               {v}
             </div>
           ))}
@@ -947,7 +947,7 @@ function SettingsModal({ onClose, courses, settings, onSave }: {
             <p className="text-xs text-gray-400 mb-4">期限の何時間・何分前に通知するか</p>
             <div className="flex items-center justify-center gap-4 bg-gray-50 rounded-2xl py-4 px-6 border-2 border-black">
               <PickerColumn values={hourValues} selected={hours} onChange={setHours} label="時間" />
-              <span className="font-pixel text-gray-300 mb-6" style={{ fontSize: "20px" }}>:</span>
+              <span className="font-pixel text-white mb-6" style={{ fontSize: "20px" }}>:</span>
               <PickerColumn values={minValues} selected={mins} onChange={setMins} label="分" />
             </div>
             <p className="text-xs text-gray-400 mt-2">※新しく追加された課題から適用されます</p>
