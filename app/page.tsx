@@ -88,10 +88,10 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: () => void 
   return (
     <button
       onClick={onChange}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none border-2 border-black ${enabled ? "bg-black" : "bg-white"}`}
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none border-2 border-black ${enabled ? "bg-[#c8f135]" : "bg-black"}`}
     >
       <span
-        className={`inline-block h-4 w-4 transform rounded-full transition-transform duration-200 border-2 border-black ${enabled ? "translate-x-5 bg-[#c8f135]" : "translate-x-0.5 bg-white"}`}
+        className={`inline-block h-4 w-4 transform rounded-full transition-transform duration-200 border-2 border-black ${enabled ? "translate-x-5 bg-black" : "translate-x-0.5 bg-[#c8f135]"}`}
       />
     </button>
   );
@@ -201,9 +201,9 @@ function AddCustomAssignmentModal({ onClose, onAdd, defaultCourseName }: {
               <p className="font-pixel text-gray-500" style={{ fontSize: "7px" }}>DUE DATE</p>
               <button
                 onClick={() => setHasDue((v) => !v)}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full border-2 border-black transition-colors ${hasDue ? "bg-black" : "bg-white"}`}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full border-2 border-black transition-colors ${hasDue ? "bg-[#c8f135]" : "bg-black"}`}
               >
-                <span className={`inline-block h-3 w-3 rounded-full border-2 border-black transition-transform ${hasDue ? "translate-x-4 bg-[#c8f135]" : "translate-x-0.5 bg-white"}`} />
+                <span className={`inline-block h-3 w-3 rounded-full border-2 border-black transition-transform ${hasDue ? "translate-x-4 bg-black" : "translate-x-0.5 bg-[#c8f135]"}`} />
               </button>
             </div>
             {hasDue && (
@@ -557,10 +557,7 @@ function RecurringAssignmentRow({ recurring, onDelete, onToggle }: {
           {intervalLabel}{assignedDayLabel}曜日出題 → {dueDayLabel}期限 {recurring.due_time !== "23:59" ? recurring.due_time : ""}
         </p>
       </div>
-      <button
-        onClick={() => onToggle(!recurring.active)}
-        className={`w-7 h-4 rounded-full border-2 border-black flex-shrink-0 transition-colors ${recurring.active ? "bg-[#c8f135]" : "bg-gray-200"}`}
-      />
+      <Toggle enabled={recurring.active} onChange={() => onToggle(!recurring.active)} />
       <button onClick={onDelete} className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0">
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
