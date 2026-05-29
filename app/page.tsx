@@ -776,7 +776,7 @@ function CustomCourseCard({ course, pendingCount, onOpen, onDelete }: {
 }
 
 // ---- 課題カード ----
-function AssignmentCard({ assignment }: { assignment: Assignment }) {
+function AssignmentCard({ assignment, userEmail }: { assignment: Assignment; userEmail?: string }) {
   const urgency = getUrgency(assignment.dueDate, assignment.submitted);
 
   const cardStyle: Record<string, string> = {
@@ -851,7 +851,11 @@ function AssignmentCard({ assignment }: { assignment: Assignment }) {
         </div>
       </div>
       <button
-        onClick={() => window.open(assignment.alternateLink, "_blank")}
+        onClick={() => {
+          const url = new URL(assignment.alternateLink);
+          if (userEmail) url.searchParams.set("authuser", userEmail);
+          window.open(url.toString(), "_blank");
+        }}
         className={`text-xs px-3 py-1.5 rounded-full border-2 transition-colors flex-shrink-0 ml-3 font-semibold ${openBtnStyle[urgency]}`}
       >
         開く
@@ -861,13 +865,14 @@ function AssignmentCard({ assignment }: { assignment: Assignment }) {
 }
 
 // ---- セクション ----
-function Section({ title, assignments, customAssignments = [], onToggleCustom, onDeleteCustom, defaultOpen = true }: {
+function Section({ title, assignments, customAssignments = [], onToggleCustom, onDeleteCustom, defaultOpen = true, userEmail }: {
   title: string;
   assignments: Assignment[];
   customAssignments?: CustomAssignment[];
   onToggleCustom?: (id: string) => void;
   onDeleteCustom?: (id: string) => void;
   defaultOpen?: boolean;
+  userEmail?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const total = assignments.length + customAssignments.length;
@@ -886,7 +891,7 @@ function Section({ title, assignments, customAssignments = [], onToggleCustom, o
           <p className="text-xs text-gray-400 pl-2 font-pixel" style={{ fontSize: "8px" }}>· NO TASKS ·</p>
         ) : (
           <>
-            {assignments.map((a) => <AssignmentCard key={a.id} assignment={a} />)}
+            {assignments.map((a) => <AssignmentCard key={a.id} assignment={a} userEmail={userEmail} />)}
             {customAssignments.map((a) => (
               <CustomAssignmentCard
                 key={a.id}
@@ -1542,6 +1547,7 @@ export default function Home() {
                           onToggleCustom={toggleCustomSubmit}
                           onDeleteCustom={deleteCustomAssignment}
                           defaultOpen={section !== "later"}
+                          userEmail={session?.user?.email ?? undefined}
                         />
                       );
                     })}
