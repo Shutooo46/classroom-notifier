@@ -144,7 +144,7 @@ export async function GET(request: Request) {
             assignment.dueDate.month - 1,
             assignment.dueDate.day,
             assignment.dueTime?.hours ?? 14,
-            assignment.dueTime?.minutes ?? 59
+            assignment.dueTime != null ? (assignment.dueTime.minutes ?? 0) : 59
           ));
           const now = new Date();
           const diffMinutes = (dueWithTime.getTime() - now.getTime()) / 60000;
