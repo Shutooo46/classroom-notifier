@@ -1048,22 +1048,24 @@ function PickerColumn({ values, selected, onChange, label }: {
 }
 
 // ---- 設定モーダル ----
-function SettingsModal({ onClose, courses, settings, onSave }: {
+function SettingsModal({ onClose, courses, settings, onSave, userEmail }: {
   onClose: () => void; courses: Course[]; settings: UserSettings;
   onSave: (patch: Partial<UserSettings>) => Promise<void>;
+  userEmail: string;
 }) {
+  const [activeSection, setActiveSection] = useState<"account" | "notifications" | "display">("account");
   const [hours, setHours] = useState(Math.floor(settings.reminder_minutes / 60));
+  const [mins, setMins] = useState(settings.reminder_minutes % 60);
+  const [perCourseNotify, setPerCourseNotify] = useState(settings.per_course_notify);
+  const [notifyAnnouncements, setNotifyAnnouncements] = useState(settings.notify_announcements);
+  const [notifyMaterials, setNotifyMaterials] = useState(settings.notify_materials);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
-  const [mins, setMins] = useState(settings.reminder_minutes % 60);
-  const [perCourseNotify, setPerCourseNotify] = useState(settings.per_course_notify);
-  const [notifyAnnouncements, setNotifyAnnouncements] = useState(settings.notify_announcements);
-  const [notifyMaterials, setNotifyMaterials] = useState(settings.notify_materials);
-  const [saving, setSaving] = useState(false);
 
   const hiddenCourses = courses.filter((c) => settings.course_settings[c.id]?.hidden === true);
 
@@ -1082,6 +1084,12 @@ function SettingsModal({ onClose, courses, settings, onSave }: {
   const hourValues = Array.from({ length: 24 }, (_, i) => String(i));
   const minValues = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
 
+  const sections = [
+    { key: "account", label: "アカウント" },
+    { key: "notifications", label: "通知" },
+    { key: "display", label: "表示" },
+  ] as const;
+
   return (
     <div style={{ backgroundColor: "rgba(0,0,0,0.5)" }} className="fixed inset-0 flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl w-96 border-2 border-black shadow-[6px_6px_0px_#1a1a1a] max-h-[85vh] flex flex-col">
@@ -1090,79 +1098,114 @@ function SettingsModal({ onClose, courses, settings, onSave }: {
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg border-2 border-black hover:bg-gray-100 font-bold text-sm">✕</button>
         </div>
 
+        {/* セクションタブ */}
+        <div className="flex border-b-2 border-black">
+          {sections.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setActiveSection(key)}
+              className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${activeSection === key ? "bg-black text-[#c8f135]" : "text-gray-400 hover:text-black hover:bg-gray-50"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         <div className="overflow-y-auto flex-1 p-6 space-y-6">
-          <div>
-            <p className="font-pixel text-black mb-1" style={{ fontSize: "8px" }}>REMINDER TIMING</p>
-            <p className="text-xs text-gray-400 mb-4">期限の何時間・何分前に通知するか</p>
-            <div className="flex items-center justify-center gap-4 bg-gray-50 rounded-2xl py-4 px-6 border-2 border-black">
-              <PickerColumn values={hourValues} selected={hours} onChange={setHours} label="時間" />
-              <span className="font-pixel text-white mb-6" style={{ fontSize: "20px" }}>:</span>
-              <PickerColumn values={minValues} selected={mins} onChange={setMins} label="分" />
-            </div>
-            <p className="text-xs text-gray-400 mt-2">※新しく追加された課題から適用されます</p>
-          </div>
-
-          <div>
-            <p className="font-pixel text-black mb-3" style={{ fontSize: "8px" }}>NOTIFICATIONS</p>
-            <div className="space-y-3">
-              {[
-                { label: "授業別に通知設定する", sub: "オフにすると全授業で通知", val: perCourseNotify, set: setPerCourseNotify },
-                { label: "お知らせ通知", sub: null, val: notifyAnnouncements, set: setNotifyAnnouncements },
-                { label: "資料投稿通知", sub: null, val: notifyMaterials, set: setNotifyMaterials },
-              ].map(({ label, sub, val, set }) => (
-                <div key={label} className="flex items-center justify-between py-2 border-b border-gray-100">
-                  <div>
-                    <p className="text-sm font-semibold text-black">{label}</p>
-                    {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
-                  </div>
-                  <Toggle enabled={val} onChange={() => set((v: boolean) => !v)} />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="font-pixel text-black mb-3" style={{ fontSize: "8px" }}>DISCORD</p>
-            <div className="flex items-center justify-between py-2 border-b border-gray-100">
+          {activeSection === "account" && (
+            <>
               <div>
-                <p className="text-sm font-semibold text-black">Discord DM通知</p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {settings.discord_user_id ? <span>連携済み <span className="text-[#c8f135]">✓</span></span> : "未連携"}
-                </p>
+                <p className="font-pixel text-black mb-3" style={{ fontSize: "8px" }}>GOOGLE</p>
+                <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                  <div>
+                    <p className="text-sm font-semibold text-black">Googleアカウント</p>
+                    <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[200px]">{userEmail}</p>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                {settings.discord_user_id && (
-                  <button
-                    onClick={async () => {
-                      await fetch("/api/discord/disconnect", { method: "POST" });
-                      await onSave({ discord_user_id: null });
-                    }}
-                    className="text-xs px-3 py-1.5 rounded-full border-2 border-black bg-white text-red-500 font-semibold hover:bg-red-50 transition-colors">
-                    解除
-                  </button>
-                )}
-                <a href="/api/discord/connect"
-                  className="text-xs px-3 py-1.5 rounded-full border-2 border-black bg-[#5865F2] text-white font-semibold hover:opacity-80 transition-opacity">
-                  {settings.discord_user_id ? "再連携" : "連携する"}
-                </a>
-              </div>
-            </div>
-          </div>
 
-          {hiddenCourses.length > 0 && (
+              <div>
+                <p className="font-pixel text-black mb-3" style={{ fontSize: "8px" }}>DISCORD</p>
+                <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                  <div>
+                    <p className="text-sm font-semibold text-black">Discord DM通知</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {settings.discord_user_id ? <span>連携済み <span className="text-[#c8f135]">✓</span></span> : "未連携"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {settings.discord_user_id && (
+                      <button
+                        onClick={async () => {
+                          await fetch("/api/discord/disconnect", { method: "POST" });
+                          await onSave({ discord_user_id: null });
+                        }}
+                        className="text-xs px-3 py-1.5 rounded-full border-2 border-black bg-white text-red-500 font-semibold hover:bg-red-50 transition-colors">
+                        解除
+                      </button>
+                    )}
+                    <a href="/api/discord/connect"
+                      className="text-xs px-3 py-1.5 rounded-full border-2 border-black bg-[#5865F2] text-white font-semibold hover:opacity-80 transition-opacity">
+                      {settings.discord_user_id ? "再連携" : "連携する"}
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeSection === "notifications" && (
+            <>
+              <div>
+                <p className="font-pixel text-black mb-1" style={{ fontSize: "8px" }}>REMINDER TIMING</p>
+                <p className="text-xs text-gray-400 mb-4">期限の何時間・何分前に通知するか</p>
+                <div className="flex items-center justify-center gap-4 bg-gray-50 rounded-2xl py-4 px-6 border-2 border-black">
+                  <PickerColumn values={hourValues} selected={hours} onChange={setHours} label="時間" />
+                  <span className="font-pixel text-white mb-6" style={{ fontSize: "20px" }}>:</span>
+                  <PickerColumn values={minValues} selected={mins} onChange={setMins} label="分" />
+                </div>
+                <p className="text-xs text-gray-400 mt-2">※新しく追加された課題から適用されます</p>
+              </div>
+
+              <div>
+                <p className="font-pixel text-black mb-3" style={{ fontSize: "8px" }}>NOTIFICATIONS</p>
+                <div className="space-y-3">
+                  {[
+                    { label: "授業別に通知設定する", sub: "オフにすると全授業で通知", val: perCourseNotify, set: setPerCourseNotify },
+                    { label: "お知らせ通知", sub: null, val: notifyAnnouncements, set: setNotifyAnnouncements },
+                    { label: "資料投稿通知", sub: null, val: notifyMaterials, set: setNotifyMaterials },
+                  ].map(({ label, sub, val, set }) => (
+                    <div key={label} className="flex items-center justify-between py-2 border-b border-gray-100">
+                      <div>
+                        <p className="text-sm font-semibold text-black">{label}</p>
+                        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+                      </div>
+                      <Toggle enabled={val} onChange={() => set((v: boolean) => !v)} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeSection === "display" && (
             <div>
               <p className="font-pixel text-black mb-3" style={{ fontSize: "8px" }}>HIDDEN COURSES</p>
-              <div className="space-y-1">
-                {hiddenCourses.map((course) => (
-                  <div key={course.id} className="flex items-center justify-between py-2.5">
-                    <p className="text-sm text-gray-700 flex-1 pr-4 truncate">{course.name}</p>
-                    <button onClick={() => unhideCourse(course.id)}
-                      className="text-xs px-3 py-1 rounded-full border-2 border-black bg-[#c8f135] font-semibold hover:opacity-80 transition-opacity">
-                      再表示
-                    </button>
-                  </div>
-                ))}
-              </div>
+              {hiddenCourses.length === 0 ? (
+                <p className="text-xs text-gray-400">非表示にしているコースはありません</p>
+              ) : (
+                <div className="space-y-1">
+                  {hiddenCourses.map((course) => (
+                    <div key={course.id} className="flex items-center justify-between py-2.5">
+                      <p className="text-sm text-gray-700 flex-1 pr-4 truncate">{course.name}</p>
+                      <button onClick={() => unhideCourse(course.id)}
+                        className="text-xs px-3 py-1 rounded-full border-2 border-black bg-[#c8f135] font-semibold hover:opacity-80 transition-opacity">
+                        再表示
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1171,10 +1214,12 @@ function SettingsModal({ onClose, courses, settings, onSave }: {
           <button onClick={onClose} className="flex-1 border-2 border-black py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-100 transition-colors">
             キャンセル
           </button>
-          <button onClick={save} disabled={saving}
-            className="flex-1 border-2 border-black py-2.5 rounded-xl text-sm font-semibold bg-black text-[#c8f135] hover:opacity-90 disabled:opacity-50 transition-opacity">
-            {saving ? "SAVING..." : "SAVE"}
-          </button>
+          {activeSection === "notifications" && (
+            <button onClick={save} disabled={saving}
+              className="flex-1 border-2 border-black py-2.5 rounded-xl text-sm font-semibold bg-black text-[#c8f135] hover:opacity-90 disabled:opacity-50 transition-opacity">
+              {saving ? "SAVING..." : "SAVE"}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -1389,7 +1434,7 @@ export default function Home() {
   return (
     <>
       {hideTarget && <HideConfirmDialog courseName={hideTarget.name} onConfirm={confirmHide} onCancel={() => setHideTarget(null)} />}
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} courses={data?.courses ?? []} settings={settings} onSave={saveSettings} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} courses={data?.courses ?? []} settings={settings} onSave={saveSettings} userEmail={session?.user?.email ?? ""} />}
       {showAddModal && (
         <AddCustomAssignmentModal
           onClose={() => setShowAddModal(false)}
