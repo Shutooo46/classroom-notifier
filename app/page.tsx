@@ -250,7 +250,7 @@ function CustomAssignmentCard({ assignment, onToggle, onDelete }: {
   const cardBase = "rounded-2xl p-4 mb-2 flex items-start justify-between transition-all border-dashed border-2";
   const cardStyle: Record<string, string> = {
     done: `${cardBase} border-black bg-gray-100 shadow-[3px_3px_0px_#1a1a1a] opacity-60`,
-    high: `${cardBase} border-[#ff6b6b] bg-white shadow-[3px_3px_0px_#ff6b6b]`,
+    high: `${cardBase} border-black bg-white shadow-[3px_3px_0px_#1a1a1a] border-l-[6px] border-l-[#ff6b6b]`,
     mid:  `${cardBase} border-black bg-white shadow-[3px_3px_0px_#1a1a1a] border-l-[6px] border-l-[#c8f135]`,
     low:  `${cardBase} border-black bg-white shadow-[3px_3px_0px_#1a1a1a] border-l-[6px] border-l-[#7dd3fc]`,
     none: `${cardBase} border-black bg-white shadow-[3px_3px_0px_#1a1a1a]`,
