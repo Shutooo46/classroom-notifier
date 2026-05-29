@@ -266,7 +266,7 @@ function CustomAssignmentCard({ assignment, onToggle, onDelete }: {
       <div className="flex items-start gap-3 flex-1 min-w-0">
         <button
           onClick={onToggle}
-          className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${assignment.submitted ? "bg-[#c8f135] border-black" : "bg-white border-black"}`}
+          className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${assignment.submitted ? "bg-[#c8f135] border-black" : "bg-white dark:bg-[#2a2a2a] border-black dark:border-[#555]"}`}
         >
           {assignment.submitted && (
             <svg className="w-3 h-3 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -765,8 +765,8 @@ function CustomCourseCard({ course, pendingCount, onOpen, onDelete }: {
               </div>
             )}
           </div>
-          <button onClick={onOpen} className="p-1.5 rounded-lg border-2 border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] hover:bg-[#c8f135] transition-colors">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="black" strokeWidth={2.5}>
+          <button onClick={onOpen} className="p-1.5 rounded-lg border-2 border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] hover:bg-[#c8f135] dark:hover:bg-[#c8f135] transition-colors">
+            <svg className="w-4 h-4 stroke-black dark:stroke-white" fill="none" viewBox="0 0 24 24" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
           </button>
@@ -997,8 +997,8 @@ function CourseCard({
               </div>
             )}
           </div>
-          <button onClick={onOpen} className="p-1.5 rounded-lg border-2 border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] hover:bg-[#c8f135] transition-colors">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="black" strokeWidth={2.5}>
+          <button onClick={onOpen} className="p-1.5 rounded-lg border-2 border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] hover:bg-[#c8f135] dark:hover:bg-[#c8f135] transition-colors">
+            <svg className="w-4 h-4 stroke-black dark:stroke-white" fill="none" viewBox="0 0 24 24" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
           </button>
