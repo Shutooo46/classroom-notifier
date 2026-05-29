@@ -1130,10 +1130,22 @@ function SettingsModal({ onClose, courses, settings, onSave }: {
                   {settings.discord_user_id ? "連携済み ✓" : "未連携"}
                 </p>
               </div>
-              <a href="/api/discord/connect"
-                className="text-xs px-3 py-1.5 rounded-full border-2 border-black bg-[#5865F2] text-white font-semibold hover:opacity-80 transition-opacity">
-                {settings.discord_user_id ? "再連携" : "連携する"}
-              </a>
+              <div className="flex items-center gap-2">
+                {settings.discord_user_id && (
+                  <button
+                    onClick={async () => {
+                      await fetch("/api/discord/disconnect", { method: "POST" });
+                      await onSave({ discord_user_id: null });
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-full border-2 border-black bg-white text-red-500 font-semibold hover:bg-red-50 transition-colors">
+                    解除
+                  </button>
+                )}
+                <a href="/api/discord/connect"
+                  className="text-xs px-3 py-1.5 rounded-full border-2 border-black bg-[#5865F2] text-white font-semibold hover:opacity-80 transition-opacity">
+                  {settings.discord_user_id ? "再連携" : "連携する"}
+                </a>
+              </div>
             </div>
           </div>
 
