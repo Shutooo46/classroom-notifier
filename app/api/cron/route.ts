@@ -128,7 +128,7 @@ export async function GET(request: Request) {
 
           fetch(`${process.env.CLOUD_RUN_URL}/process`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CLOUD_RUN_SECRET}` },
             body: JSON.stringify({
               assignment,
               course,
@@ -171,7 +171,7 @@ export async function GET(request: Request) {
               });
               fetch(`${process.env.CLOUD_RUN_URL}/process-classroom-reminder`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CLOUD_RUN_SECRET}` },
                 body: JSON.stringify({
                   assignment_title: assignment.title,
                   course_name: course.name,
@@ -201,7 +201,7 @@ export async function GET(request: Request) {
               });
               fetch(`${process.env.CLOUD_RUN_URL}/process-classroom-reminder`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CLOUD_RUN_SECRET}` },
                 body: JSON.stringify({
                   assignment_title: assignment.title,
                   course_name: course.name,
@@ -248,7 +248,7 @@ export async function GET(request: Request) {
 
             fetch(`${process.env.CLOUD_RUN_URL}/process-announcement`, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CLOUD_RUN_SECRET}` },
               body: JSON.stringify({ announcement, course, user_id: user.user_id, discord_user_id: discordUserId }),
             }).catch((e) => console.error("Cloud Run announcement error:", e));
           }
@@ -295,7 +295,7 @@ export async function GET(request: Request) {
 
             fetch(`${process.env.CLOUD_RUN_URL}/process-material`, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CLOUD_RUN_SECRET}` },
               body: JSON.stringify({ material, course, user_id: user.user_id, accessToken, driveFileIds, discord_user_id: discordUserId }),
             }).catch((e) => console.error("Cloud Run material error:", e));
           }
@@ -376,7 +376,7 @@ export async function GET(request: Request) {
 
           fetch(`${process.env.CLOUD_RUN_URL}/process-custom-reminder`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CLOUD_RUN_SECRET}` },
             body: JSON.stringify({
               assignment: { id: assignmentId, title: template.title, course_name: template.course_name, due_date: dueDateStr, due_time: template.due_time ?? "23:59" },
               reminderType: "new",
@@ -423,7 +423,7 @@ export async function GET(request: Request) {
             });
             fetch(`${process.env.CLOUD_RUN_URL}/process-custom-reminder`, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CLOUD_RUN_SECRET}` },
               body: JSON.stringify({ assignment, reminderType: "24h", discord_user_id: discordUserId }),
             }).catch((e) => console.error("Cloud Run custom reminder error:", e));
           }
@@ -448,7 +448,7 @@ export async function GET(request: Request) {
             });
             fetch(`${process.env.CLOUD_RUN_URL}/process-custom-reminder`, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CLOUD_RUN_SECRET}` },
               body: JSON.stringify({ assignment, reminderType: "reminder", reminderMinutes, discord_user_id: discordUserId }),
             }).catch((e) => console.error("Cloud Run custom reminder error:", e));
           }
