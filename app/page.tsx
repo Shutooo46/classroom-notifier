@@ -1127,7 +1127,7 @@ function SettingsModal({ onClose, courses, settings, onSave }: {
               <div>
                 <p className="text-sm font-semibold text-black">Discord DM通知</p>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  {settings.discord_user_id ? "連携済み ✓" : "未連携"}
+                  {settings.discord_user_id ? <span>連携済み <span className="text-[#c8f135]">✓</span></span> : "未連携"}
                 </p>
               </div>
               <div className="flex items-center gap-2">
