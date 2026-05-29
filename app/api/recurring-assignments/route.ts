@@ -91,9 +91,26 @@ export async function PATCH(request: Request) {
   if (!session) return NextResponse.json({ error: "ログインが必要です" }, { status: 401 });
 
   const userId = (session as any).userId;
-  const { id, active } = await request.json();
-  await supabase.from("recurring_assignments").update({ active }).eq("id", id).eq("user_id", userId);
-  return NextResponse.json({ success: true });
+  const { id, active, title, day_of_week, interval_weeks, due_days_offset, due_time } = await request.json();
+
+  const patch: Record<string, unknown> = {};
+  if (active !== undefined) patch.active = active;
+  if (title !== undefined) patch.title = title;
+  if (day_of_week !== undefined) patch.day_of_week = day_of_week;
+  if (interval_weeks !== undefined) patch.interval_weeks = interval_weeks;
+  if (due_days_offset !== undefined) patch.due_days_offset = due_days_offset;
+  if (due_time !== undefined) patch.due_time = due_time;
+
+  const { data, error } = await supabase
+    .from("recurring_assignments")
+    .update(patch)
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select()
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data);
 }
 
 export async function DELETE(request: Request) {

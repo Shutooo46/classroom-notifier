@@ -538,11 +538,149 @@ function AddRecurringAssignmentModal({ onClose, onAdd, onAddAssignments, default
   );
 }
 
+// ---- 繰り返し課題編集モーダル ----
+function EditRecurringAssignmentModal({ recurring, onClose, onSave }: {
+  recurring: RecurringAssignment;
+  onClose: () => void;
+  onSave: (updated: RecurringAssignment) => void;
+}) {
+  const [title, setTitle] = useState(recurring.title);
+  const [dayOfWeek, setDayOfWeek] = useState(recurring.day_of_week);
+  const [intervalWeeks, setIntervalWeeks] = useState(recurring.interval_weeks);
+  const [dueDaysOffset, setDueDaysOffset] = useState(recurring.due_days_offset);
+  const [dueHour, setDueHour] = useState(Number(recurring.due_time.split(":")[0]));
+  const [dueMinute, setDueMinute] = useState(Number(recurring.due_time.split(":")[1]));
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const hourValues = Array.from({ length: 24 }, (_, i) => String(i));
+  const minValues = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
+  const dueTimeStr = `${String(dueHour).padStart(2, "0")}:${String(dueMinute).padStart(2, "0")}`;
+
+  const nextAssigned = getNextDayOfWeek(dayOfWeek);
+  const nextDue = new Date(nextAssigned);
+  nextDue.setDate(nextAssigned.getDate() + dueDaysOffset);
+  const assignedLabel = `${nextAssigned.getMonth() + 1}/${nextAssigned.getDate()}（${DAY_LABELS[nextAssigned.getDay()]}）`;
+  const dueLabel = `${nextDue.getMonth() + 1}/${nextDue.getDate()}（${DAY_LABELS[nextDue.getDay()]}）`;
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const save = async () => {
+    if (!title.trim()) return;
+    setSaving(true);
+    setErrorMsg("");
+    const res = await fetch("/api/recurring-assignments", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: recurring.id, title: title.trim(), day_of_week: dayOfWeek, interval_weeks: intervalWeeks, due_days_offset: dueDaysOffset, due_time: dueTimeStr }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.id) { setErrorMsg(data.error ?? "保存に失敗しました"); setSaving(false); return; }
+    onSave(data as RecurringAssignment);
+    setSaving(false);
+    onClose();
+  };
+
+  return (
+    <div style={{ backgroundColor: "rgba(0,0,0,0.5)" }} className="fixed inset-0 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-80 border-2 border-black shadow-[6px_6px_0px_#1a1a1a] max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-6 pb-4 border-b-2 border-black">
+          <p className="font-pixel text-black" style={{ fontSize: "9px" }}>EDIT RECURRING</p>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg border-2 border-black hover:bg-gray-100 font-bold text-sm">✕</button>
+        </div>
+        <div className="overflow-y-auto flex-1 p-6 space-y-4">
+          <div>
+            <p className="font-pixel text-gray-500 mb-1" style={{ fontSize: "7px" }}>TITLE *</p>
+            <input
+              autoFocus
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="課題タイトル"
+              className="w-full border-2 border-black rounded-xl px-3 py-2 text-sm focus:outline-none"
+            />
+          </div>
+          <div>
+            <p className="font-pixel text-gray-500 mb-1" style={{ fontSize: "7px" }}>COURSE</p>
+            <p className="text-sm font-semibold text-gray-500 px-3 py-2 bg-gray-50 rounded-xl border-2 border-black">{recurring.course_name}</p>
+          </div>
+          <div>
+            <p className="font-pixel text-gray-500 mb-1.5" style={{ fontSize: "7px" }}>出題される曜日</p>
+            <div className="flex gap-1">
+              {DAY_LABELS.map((label, i) => (
+                <button key={i} onClick={() => setDayOfWeek(i)}
+                  className={`flex-1 py-1.5 rounded-lg border-2 text-xs font-bold transition-colors ${dayOfWeek === i ? "bg-black text-[#c8f135] border-black" : "bg-white text-black border-black hover:bg-gray-100"}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="font-pixel text-gray-500 mb-1.5" style={{ fontSize: "7px" }}>提出期限（出題日から何日後？）</p>
+            <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2 border-2 border-black">
+              <button onClick={() => setDueDaysOffset((v) => Math.max(0, v - 1))}
+                className="w-8 h-8 rounded-lg border-2 border-black bg-white font-bold text-lg flex items-center justify-center hover:bg-gray-100 flex-shrink-0">−</button>
+              <div className="flex-1 text-center">
+                <p className="text-xl font-bold text-black">{dueDaysOffset}<span className="text-sm ml-0.5">日後</span></p>
+                <p className="text-xs text-gray-400">{DAY_LABELS[nextDue.getDay()]}曜日が期限</p>
+              </div>
+              <button onClick={() => setDueDaysOffset((v) => Math.min(30, v + 1))}
+                className="w-8 h-8 rounded-lg border-2 border-black bg-white font-bold text-lg flex items-center justify-center hover:bg-gray-100 flex-shrink-0">+</button>
+            </div>
+          </div>
+          <div>
+            <p className="font-pixel text-gray-500 mb-1.5" style={{ fontSize: "7px" }}>周期</p>
+            <div className="flex gap-2">
+              {[{ label: "毎週", val: 1 }, { label: "2週ごと", val: 2 }].map(({ label, val }) => (
+                <button key={val} onClick={() => setIntervalWeeks(val)}
+                  className={`flex-1 py-2 rounded-xl border-2 text-sm font-semibold transition-colors ${intervalWeeks === val ? "bg-black text-[#c8f135] border-black" : "bg-white text-black border-black hover:bg-gray-100"}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="font-pixel text-gray-500 mb-1.5" style={{ fontSize: "7px" }}>締め切り時刻</p>
+            <div className="flex items-center justify-center gap-3 bg-black rounded-2xl py-3 px-4 border-2 border-black">
+              <PickerColumn values={hourValues} selected={dueHour} onChange={setDueHour} label="時" />
+              <span className="font-pixel text-white mb-6" style={{ fontSize: "20px" }}>:</span>
+              <PickerColumn values={minValues} selected={dueMinute} onChange={setDueMinute} label="分" />
+            </div>
+          </div>
+          <div className="bg-gray-50 rounded-xl px-3 py-2.5 border-2 border-black space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="font-pixel text-gray-400" style={{ fontSize: "6px" }}>出題</span>
+              <span className="text-xs font-semibold text-gray-600">{assignedLabel}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="font-pixel text-[#ff6b6b]" style={{ fontSize: "6px" }}>期限</span>
+              <span className="text-xs font-bold text-black">{dueLabel} {dueTimeStr}</span>
+            </div>
+          </div>
+          <p className="text-xs text-gray-400">※ 次回の出題曜日から新しい設定が反映されます</p>
+          {errorMsg && <p className="text-xs text-red-500 font-semibold">{errorMsg}</p>}
+        </div>
+        <div className="flex gap-3 p-6 pt-4 border-t-2 border-black">
+          <button onClick={onClose} className="flex-1 border-2 border-black py-2 rounded-xl text-sm font-semibold hover:bg-gray-100">キャンセル</button>
+          <button onClick={save} disabled={saving || !title.trim()}
+            className="flex-1 border-2 border-black py-2 rounded-xl text-sm font-semibold bg-black text-[#c8f135] hover:opacity-90 disabled:opacity-40">
+            {saving ? "..." : "上書き保存"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---- 繰り返し課題行 ----
-function RecurringAssignmentRow({ recurring, onDelete, onToggle }: {
+function RecurringAssignmentRow({ recurring, onDelete, onToggle, onEdit }: {
   recurring: RecurringAssignment;
   onDelete: () => void;
   onToggle: (active: boolean) => void;
+  onEdit: () => void;
 }) {
   const intervalLabel = recurring.interval_weeks === 1 ? "毎週" : "2週ごと";
   const assignedDayLabel = DAY_LABELS[recurring.day_of_week] ?? "?";
@@ -558,6 +696,11 @@ function RecurringAssignmentRow({ recurring, onDelete, onToggle }: {
         </p>
       </div>
       <Toggle enabled={recurring.active} onChange={() => onToggle(!recurring.active)} />
+      <button onClick={onEdit} className="text-gray-300 hover:text-black transition-colors flex-shrink-0">
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+      </button>
       <button onClick={onDelete} className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0">
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -1023,6 +1166,7 @@ export default function Home() {
   const [showAddCourseModal, setShowAddCourseModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAddRecurringModal, setShowAddRecurringModal] = useState(false);
+  const [editingRecurring, setEditingRecurring] = useState<RecurringAssignment | null>(null);
   const [selectedCustomCourseId, setSelectedCustomCourseId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1214,6 +1358,16 @@ export default function Home() {
           defaultCourseName={selectedCustomCourse?.name}
         />
       )}
+      {editingRecurring && (
+        <EditRecurringAssignmentModal
+          recurring={editingRecurring}
+          onClose={() => setEditingRecurring(null)}
+          onSave={(updated) => {
+            setRecurringAssignments((prev) => prev.map((r) => r.id === updated.id ? updated : r));
+            setEditingRecurring(null);
+          }}
+        />
+      )}
 
       <div className="max-w-2xl mx-auto p-6">
         {/* ヘッダー */}
@@ -1336,6 +1490,7 @@ export default function Home() {
                                   recurring={r}
                                   onDelete={() => deleteRecurringAssignment(r.id)}
                                   onToggle={(active) => toggleRecurringActive(r.id, active)}
+                                  onEdit={() => setEditingRecurring(r)}
                                 />
                               ))}
                             </div>
