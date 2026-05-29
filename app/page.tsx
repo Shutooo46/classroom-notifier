@@ -1112,19 +1112,36 @@ function SettingsModal({ onClose, courses, settings, onSave, userEmail, theme, o
           {!activeSection && (
             <div className="divide-y-2 divide-black dark:divide-[#555]">
               {[
-                { key: "account", label: "アカウント", sub: userEmail },
-                { key: "notifications", label: "通知", sub: "リマインド・通知設定" },
-                { key: "display", label: "表示", sub: "非表示コース" },
-                { key: "theme", label: "テーマ", sub: "ライト / ダーク" },
-              ].map(({ key, label, sub }) => (
+                { key: "account", label: "アカウント", icon: (
+                  <svg className="w-5 h-5 stroke-black dark:stroke-white" fill="none" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                  </svg>
+                )},
+                { key: "notifications", label: "通知", icon: (
+                  <svg className="w-5 h-5 stroke-black dark:stroke-white" fill="none" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+                  </svg>
+                )},
+                { key: "display", label: "表示", icon: (
+                  <svg className="w-5 h-5 stroke-black dark:stroke-white" fill="none" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                )},
+                { key: "theme", label: "テーマ", icon: (
+                  <svg className="w-5 h-5 stroke-black dark:stroke-white" fill="none" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+                  </svg>
+                )},
+              ].map(({ key, label, icon }) => (
                 <button
                   key={key}
                   onClick={() => setActiveSection(key as "account" | "notifications" | "display" | "theme")}
                   className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors text-left"
                 >
-                  <div>
+                  <div className="flex items-center gap-3">
+                    {icon}
                     <p className="text-sm font-semibold text-black dark:text-white">{label}</p>
-                    <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[260px]">{sub}</p>
                   </div>
                   <span className="text-gray-300 text-lg">›</span>
                 </button>
