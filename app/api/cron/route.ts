@@ -58,6 +58,7 @@ export async function GET(request: Request) {
     const courses = coursesData.courses || [];
 
     for (const course of courses) {
+      if (courseSettings[course.id]?.hidden) continue;
       if (perCourseNotify && courseSettings[course.id]?.notify === false) continue;
       const workRes = await fetch(
         `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork`,
