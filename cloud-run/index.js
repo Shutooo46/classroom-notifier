@@ -332,7 +332,7 @@ app.post("/process-material", async (req, res) => {
 });
 
 app.post("/process-custom-reminder", async (req, res) => {
-  const { assignment, reminderType, reminderMinutes } = req.body;
+  const { assignment, reminderType } = req.body;
 
   try {
     const dueDateStr = assignment.due_date
@@ -344,7 +344,14 @@ app.post("/process-custom-reminder", async (req, res) => {
       title = "🔄 繰り返し課題が出題されました";
       color = 0x4285f4;
     } else if (reminderType === "reminder") {
-      title = `🚨 カスタム課題 - あと${reminderMinutes}分！`;
+      const dueDate = assignment.due_date
+        ? new Date(`${assignment.due_date}T${assignment.due_time ?? "23:59"}:00+09:00`)
+        : null;
+      const diffMs = dueDate ? dueDate.getTime() - Date.now() : 0;
+      const diffH = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffM = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      const remaining = diffH > 0 ? `${diffH}時間${diffM}分` : `${diffM}分`;
+      title = `🚨 期限まであと${remaining}！`;
       color = 0xff6b6b;
     } else {
       title = "⏰ カスタム課題 - 24時間前リマインド";
