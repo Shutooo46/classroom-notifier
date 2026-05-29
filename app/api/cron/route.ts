@@ -143,7 +143,7 @@ export async function GET(request: Request) {
             assignment.dueDate.year,
             assignment.dueDate.month - 1,
             assignment.dueDate.day,
-            assignment.dueTime?.hours ?? 23,
+            assignment.dueTime?.hours ?? 14,
             assignment.dueTime?.minutes ?? 59
           ));
           const now = new Date();
