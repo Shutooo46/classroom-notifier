@@ -106,7 +106,6 @@ export async function GET(request: Request) {
           .single();
 
         if (!existingNew) {
-          // Supabaseに先に記録（重複通知防止）
           await supabase.from("notified_assignments").insert({
             assignment_id: assignment.id,
             user_id: user.user_id,
@@ -123,7 +122,6 @@ export async function GET(request: Request) {
             }
           }
 
-          // Cloud Runに処理を投げる（非同期・待たない）
           fetch(`${process.env.CLOUD_RUN_URL}/process`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -222,6 +220,158 @@ export async function GET(request: Request) {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ material, course, user_id: user.user_id, accessToken, driveFileIds }),
             }).catch((e) => console.error("Cloud Run material error:", e));
+          }
+        }
+      }
+    }
+
+    // ---- 繰り返し課題の自動生成（出題曜日当日に1件生成 + 新着通知） ----
+    const { data: recurringTemplates } = await supabase
+      .from("recurring_assignments")
+      .select("*")
+      .eq("user_id", user.user_id)
+      .eq("active", true);
+
+    if (recurringTemplates && recurringTemplates.length > 0) {
+      // JST の今日の曜日・日付を取得
+      const nowJST = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
+      const todayDayOfWeek = nowJST.getUTCDay();
+
+      for (const template of recurringTemplates) {
+        // 出題曜日が今日でなければスキップ（intervalWeeks=2 の場合は週の判定が必要）
+        if (todayDayOfWeek !== template.day_of_week) continue;
+
+        // 2週ごとの場合、今週が出題週かチェック（epoch からの週数で判定）
+        if (template.interval_weeks === 2) {
+          const epochWeek = Math.floor(nowJST.getTime() / (7 * 24 * 60 * 60 * 1000));
+          const createdWeek = Math.floor(new Date(template.created_at).getTime() / (7 * 24 * 60 * 60 * 1000));
+          if ((epochWeek - createdWeek) % 2 !== 0) continue;
+        }
+
+        const dueDateJST = new Date(nowJST);
+        dueDateJST.setUTCDate(nowJST.getUTCDate() + (template.due_days_offset ?? 0));
+        const dueDateStr = dueDateJST.toISOString().split("T")[0];
+
+        const { data: existing } = await supabase
+          .from("custom_assignments")
+          .select("id")
+          .eq("user_id", user.user_id)
+          .eq("title", template.title)
+          .eq("course_name", template.course_name)
+          .eq("due_date", dueDateStr)
+          .single();
+
+        let assignmentId = existing?.id;
+        if (!existing) {
+          const { data: newA } = await supabase
+            .from("custom_assignments")
+            .insert({
+              user_id: user.user_id,
+              title: template.title,
+              course_name: template.course_name,
+              due_date: dueDateStr,
+              due_time: template.due_time ?? "23:59",
+            })
+            .select("id")
+            .single();
+          assignmentId = newA?.id;
+        }
+
+        if (!assignmentId) continue;
+
+        // 新着通知（まだ送っていなければ）
+        const { data: existingNotif } = await supabase
+          .from("notified_assignments")
+          .select("id")
+          .eq("assignment_id", assignmentId)
+          .eq("user_id", user.user_id)
+          .eq("notification_type", "custom_new")
+          .single();
+
+        if (!existingNotif) {
+          await supabase.from("notified_assignments").insert({
+            assignment_id: assignmentId,
+            user_id: user.user_id,
+            notified_at: new Date().toISOString(),
+            notification_type: "custom_new",
+          });
+
+          fetch(`${process.env.CLOUD_RUN_URL}/process-custom-reminder`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              assignment: { id: assignmentId, title: template.title, course_name: template.course_name, due_date: dueDateStr, due_time: template.due_time ?? "23:59" },
+              reminderType: "new",
+            }),
+          }).catch((e) => console.error("Cloud Run recurring new error:", e));
+        }
+      }
+    }
+
+    // ---- カスタム課題の期限通知 ----
+    const { data: customAssignments } = await supabase
+      .from("custom_assignments")
+      .select("*")
+      .eq("user_id", user.user_id)
+      .eq("submitted", false)
+      .not("due_date", "is", null);
+
+    if (customAssignments && customAssignments.length > 0) {
+      const now = new Date();
+      for (const assignment of customAssignments) {
+        // due_date を JST 23:59 として扱う (UTC 14:59)
+        const dueTimeStr = (assignment.due_time as string | null) ?? "23:59";
+        const dueDate = new Date(`${assignment.due_date}T${dueTimeStr}:00+09:00`);
+        const diffMinutes = (dueDate.getTime() - now.getTime()) / 60000;
+        if (diffMinutes < 0) continue;
+
+        // 24時間前通知
+        if (diffMinutes <= 24 * 60) {
+          const { data: existing24h } = await supabase
+            .from("notified_assignments")
+            .select("id")
+            .eq("assignment_id", assignment.id)
+            .eq("user_id", user.user_id)
+            .eq("notification_type", "custom_24h")
+            .single();
+
+          if (!existing24h) {
+            await supabase.from("notified_assignments").insert({
+              assignment_id: assignment.id,
+              user_id: user.user_id,
+              notified_at: new Date().toISOString(),
+              notification_type: "custom_24h",
+            });
+            fetch(`${process.env.CLOUD_RUN_URL}/process-custom-reminder`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ assignment, reminderType: "24h" }),
+            }).catch((e) => console.error("Cloud Run custom reminder error:", e));
+          }
+        }
+
+        // 設定リマインド通知（24h通知と重複しない範囲のみ）
+        if (diffMinutes <= reminderMinutes && reminderMinutes < 22 * 60) {
+          const { data: existingReminder } = await supabase
+            .from("notified_assignments")
+            .select("id")
+            .eq("assignment_id", assignment.id)
+            .eq("user_id", user.user_id)
+            .eq("notification_type", "custom_reminder")
+            .single();
+
+          if (!existingReminder) {
+            await supabase.from("notified_assignments").insert({
+              assignment_id: assignment.id,
+              user_id: user.user_id,
+              notified_at: new Date().toISOString(),
+              notification_type: "custom_reminder",
+            });
+            fetch(`${process.env.CLOUD_RUN_URL}/process-custom-reminder`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ assignment, reminderType: "reminder", reminderMinutes }),
+            }).catch((e) => console.error("Cloud Run custom reminder error:", e));
           }
         }
       }

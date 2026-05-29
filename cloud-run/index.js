@@ -331,6 +331,49 @@ app.post("/process-material", async (req, res) => {
   }
 });
 
+app.post("/process-custom-reminder", async (req, res) => {
+  const { assignment, reminderType, reminderMinutes } = req.body;
+
+  try {
+    const dueDateStr = assignment.due_date
+      ? new Date(assignment.due_date + "T14:59:00Z").toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", weekday: "short" })
+      : "期限なし";
+
+    let title, color;
+    if (reminderType === "new") {
+      title = "🔄 繰り返し課題が出題されました";
+      color = 0x4285f4;
+    } else if (reminderType === "reminder") {
+      title = `🚨 カスタム課題 - あと${reminderMinutes}分！`;
+      color = 0xff6b6b;
+    } else {
+      title = "⏰ カスタム課題 - 24時間前リマインド";
+      color = 0xffa500;
+    }
+
+    await fetch(process.env.DISCORD_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        embeds: [{
+          title,
+          color,
+          fields: [
+            { name: "課題", value: assignment.title, inline: false },
+            { name: "授業", value: assignment.course_name, inline: false },
+            { name: "期限", value: `${dueDateStr} ${assignment.due_time ?? "23:59"}`, inline: false },
+          ],
+        }]
+      }),
+    });
+
+    res.json({ message: "Done" });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e) });
+  }
+});
+
 const port = process.env.PORT || 8080;
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
