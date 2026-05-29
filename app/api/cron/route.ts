@@ -143,12 +143,11 @@ export async function GET(request: Request) {
             assignment.dueDate.year,
             assignment.dueDate.month - 1,
             assignment.dueDate.day,
-            assignment.dueTime?.hours ?? 23,
+            assignment.dueTime?.hours ?? 14,
             assignment.dueTime?.minutes ?? 59
           ));
           const now = new Date();
           const diffMinutes = (dueWithTime.getTime() - now.getTime()) / 60000;
-          console.log(`[cron debug] ${assignment.title} dueTime=${JSON.stringify(assignment.dueTime)} dueWithTime=${dueWithTime.toISOString()} diffMinutes=${Math.round(diffMinutes)}`);
 
           if (diffMinutes > 0 && diffMinutes <= 24 * 60) {
             const { data: existing24h } = await supabase
