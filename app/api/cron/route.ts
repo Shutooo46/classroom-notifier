@@ -101,21 +101,13 @@ export async function GET(request: Request) {
 
         if (submitted) continue;
 
-        const { data: existingNew } = await supabase
+        const { data: insertedNew } = await supabase
           .from("notified_assignments")
+          .upsert({ assignment_id: assignment.id, user_id: user.user_id, notified_at: new Date().toISOString(), notification_type: "new" }, { onConflict: "assignment_id,user_id,notification_type", ignoreDuplicates: true })
           .select("id")
-          .eq("assignment_id", assignment.id)
-          .eq("user_id", user.user_id)
-          .eq("notification_type", "new")
           .single();
 
-        if (!existingNew) {
-          await supabase.from("notified_assignments").insert({
-            assignment_id: assignment.id,
-            user_id: user.user_id,
-            notified_at: new Date().toISOString(),
-            notification_type: "new",
-          });
+        if (insertedNew) {
 
           const driveFileIds: string[] = [];
           if (assignment.materials) {
@@ -154,21 +146,13 @@ export async function GET(request: Request) {
           const diffMinutes = (dueWithTime.getTime() - now.getTime()) / 60000;
 
           if (diffMinutes > 0 && diffMinutes <= 24 * 60) {
-            const { data: existing24h } = await supabase
+            const { data: inserted24h } = await supabase
               .from("notified_assignments")
+              .upsert({ assignment_id: assignment.id, user_id: user.user_id, notified_at: new Date().toISOString(), notification_type: "24h" }, { onConflict: "assignment_id,user_id,notification_type", ignoreDuplicates: true })
               .select("id")
-              .eq("assignment_id", assignment.id)
-              .eq("user_id", user.user_id)
-              .eq("notification_type", "24h")
               .single();
 
-            if (!existing24h) {
-              await supabase.from("notified_assignments").insert({
-                assignment_id: assignment.id,
-                user_id: user.user_id,
-                notified_at: new Date().toISOString(),
-                notification_type: "24h",
-              });
+            if (inserted24h) {
               fetch(`${process.env.CLOUD_RUN_URL}/process-classroom-reminder`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CLOUD_RUN_SECRET}` },
@@ -184,21 +168,13 @@ export async function GET(request: Request) {
           }
 
           if (diffMinutes > 0 && diffMinutes <= reminderMinutes && reminderMinutes < 22 * 60) {
-            const { data: existingReminder } = await supabase
+            const { data: insertedReminder } = await supabase
               .from("notified_assignments")
+              .upsert({ assignment_id: assignment.id, user_id: user.user_id, notified_at: new Date().toISOString(), notification_type: "reminder" }, { onConflict: "assignment_id,user_id,notification_type", ignoreDuplicates: true })
               .select("id")
-              .eq("assignment_id", assignment.id)
-              .eq("user_id", user.user_id)
-              .eq("notification_type", "reminder")
               .single();
 
-            if (!existingReminder) {
-              await supabase.from("notified_assignments").insert({
-                assignment_id: assignment.id,
-                user_id: user.user_id,
-                notified_at: new Date().toISOString(),
-                notification_type: "reminder",
-              });
+            if (insertedReminder) {
               fetch(`${process.env.CLOUD_RUN_URL}/process-classroom-reminder`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CLOUD_RUN_SECRET}` },
@@ -230,21 +206,13 @@ export async function GET(request: Request) {
           twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
           if (createdAt < twoWeeksAgo) continue;
 
-          const { data: existing } = await supabase
+          const { data: insertedAnn } = await supabase
             .from("notified_assignments")
+            .upsert({ assignment_id: announcement.id, user_id: user.user_id, notified_at: new Date().toISOString(), notification_type: "announcement" }, { onConflict: "assignment_id,user_id,notification_type", ignoreDuplicates: true })
             .select("id")
-            .eq("assignment_id", announcement.id)
-            .eq("user_id", user.user_id)
-            .eq("notification_type", "announcement")
             .single();
 
-          if (!existing) {
-            await supabase.from("notified_assignments").insert({
-              assignment_id: announcement.id,
-              user_id: user.user_id,
-              notified_at: new Date().toISOString(),
-              notification_type: "announcement",
-            });
+          if (insertedAnn) {
 
             fetch(`${process.env.CLOUD_RUN_URL}/process-announcement`, {
               method: "POST",
@@ -270,21 +238,13 @@ export async function GET(request: Request) {
           twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
           if (createdAt < twoWeeksAgo) continue;
 
-          const { data: existing } = await supabase
+          const { data: insertedMat } = await supabase
             .from("notified_assignments")
+            .upsert({ assignment_id: material.id, user_id: user.user_id, notified_at: new Date().toISOString(), notification_type: "material" }, { onConflict: "assignment_id,user_id,notification_type", ignoreDuplicates: true })
             .select("id")
-            .eq("assignment_id", material.id)
-            .eq("user_id", user.user_id)
-            .eq("notification_type", "material")
             .single();
 
-          if (!existing) {
-            await supabase.from("notified_assignments").insert({
-              assignment_id: material.id,
-              user_id: user.user_id,
-              notified_at: new Date().toISOString(),
-              notification_type: "material",
-            });
+          if (insertedMat) {
 
             const driveFileIds: string[] = [];
             if (material.materials) {
@@ -358,21 +318,13 @@ export async function GET(request: Request) {
         if (!assignmentId) continue;
 
         // 新着通知（まだ送っていなければ）
-        const { data: existingNotif } = await supabase
+        const { data: insertedCustomNew } = await supabase
           .from("notified_assignments")
+          .upsert({ assignment_id: assignmentId, user_id: user.user_id, notified_at: new Date().toISOString(), notification_type: "custom_new" }, { onConflict: "assignment_id,user_id,notification_type", ignoreDuplicates: true })
           .select("id")
-          .eq("assignment_id", assignmentId)
-          .eq("user_id", user.user_id)
-          .eq("notification_type", "custom_new")
           .single();
 
-        if (!existingNotif) {
-          await supabase.from("notified_assignments").insert({
-            assignment_id: assignmentId,
-            user_id: user.user_id,
-            notified_at: new Date().toISOString(),
-            notification_type: "custom_new",
-          });
+        if (insertedCustomNew) {
 
           fetch(`${process.env.CLOUD_RUN_URL}/process-custom-reminder`, {
             method: "POST",
@@ -406,21 +358,13 @@ export async function GET(request: Request) {
 
         // 24時間前通知
         if (diffMinutes <= 24 * 60) {
-          const { data: existing24h } = await supabase
+          const { data: insertedCustom24h } = await supabase
             .from("notified_assignments")
+            .upsert({ assignment_id: assignment.id, user_id: user.user_id, notified_at: new Date().toISOString(), notification_type: "custom_24h" }, { onConflict: "assignment_id,user_id,notification_type", ignoreDuplicates: true })
             .select("id")
-            .eq("assignment_id", assignment.id)
-            .eq("user_id", user.user_id)
-            .eq("notification_type", "custom_24h")
             .single();
 
-          if (!existing24h) {
-            await supabase.from("notified_assignments").insert({
-              assignment_id: assignment.id,
-              user_id: user.user_id,
-              notified_at: new Date().toISOString(),
-              notification_type: "custom_24h",
-            });
+          if (insertedCustom24h) {
             fetch(`${process.env.CLOUD_RUN_URL}/process-custom-reminder`, {
               method: "POST",
               headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CLOUD_RUN_SECRET}` },
@@ -431,21 +375,13 @@ export async function GET(request: Request) {
 
         // 設定リマインド通知（24h通知と重複しない範囲のみ）
         if (diffMinutes <= reminderMinutes && reminderMinutes < 22 * 60) {
-          const { data: existingReminder } = await supabase
+          const { data: insertedCustomReminder } = await supabase
             .from("notified_assignments")
+            .upsert({ assignment_id: assignment.id, user_id: user.user_id, notified_at: new Date().toISOString(), notification_type: "custom_reminder" }, { onConflict: "assignment_id,user_id,notification_type", ignoreDuplicates: true })
             .select("id")
-            .eq("assignment_id", assignment.id)
-            .eq("user_id", user.user_id)
-            .eq("notification_type", "custom_reminder")
             .single();
 
-          if (!existingReminder) {
-            await supabase.from("notified_assignments").insert({
-              assignment_id: assignment.id,
-              user_id: user.user_id,
-              notified_at: new Date().toISOString(),
-              notification_type: "custom_reminder",
-            });
+          if (insertedCustomReminder) {
             fetch(`${process.env.CLOUD_RUN_URL}/process-custom-reminder`, {
               method: "POST",
               headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CLOUD_RUN_SECRET}` },

@@ -2,7 +2,7 @@ const express = require("express");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 
 const CLOUD_RUN_SECRET = process.env.CLOUD_RUN_SECRET;
 
@@ -189,6 +189,9 @@ async function summarizeAssignment(title, description, driveFileIds = [], access
 
 app.post("/process", async (req, res) => {
   const { assignment, course, accessToken, driveFileIds, discord_user_id } = req.body;
+  if (!assignment?.title || !course?.name || !discord_user_id) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
 
   try {
     const summary = await summarizeAssignment(
@@ -228,6 +231,9 @@ app.post("/process", async (req, res) => {
 
 app.post("/process-classroom-reminder", async (req, res) => {
   const { assignment_title, course_name, due, notification_type, discord_user_id } = req.body;
+  if (!assignment_title || !course_name || !due || !notification_type || !discord_user_id) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
 
   try {
     const dueDate = new Date(due);
@@ -272,6 +278,9 @@ app.post("/process-classroom-reminder", async (req, res) => {
 
 app.post("/process-announcement", async (req, res) => {
   const { announcement, course, discord_user_id } = req.body;
+  if (!announcement || !course?.name || !discord_user_id) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
 
   try {
     const text = announcement.text
@@ -301,6 +310,9 @@ app.post("/process-announcement", async (req, res) => {
 
 app.post("/process-material", async (req, res) => {
   const { material, course, accessToken, driveFileIds, discord_user_id } = req.body;
+  if (!material?.title || !course?.name || !discord_user_id) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
 
   try {
     const summary = await summarizeAssignment(
@@ -332,6 +344,9 @@ app.post("/process-material", async (req, res) => {
 
 app.post("/process-custom-reminder", async (req, res) => {
   const { assignment, reminderType, discord_user_id } = req.body;
+  if (!assignment?.title || !reminderType || !discord_user_id) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
 
   try {
     const dueDateStr = assignment.due_date
