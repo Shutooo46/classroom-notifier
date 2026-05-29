@@ -41,7 +41,7 @@ export async function GET(request: Request) {
 
     const { data: settings } = await supabase
       .from("user_settings")
-      .select("reminder_minutes, course_settings, per_course_notify, notify_announcements, notify_materials")
+      .select("reminder_minutes, course_settings, per_course_notify, notify_announcements, notify_materials, discord_user_id")
       .eq("user_id", user.user_id)
       .single();
     const reminderMinutes = settings?.reminder_minutes ?? 60;
@@ -49,6 +49,9 @@ export async function GET(request: Request) {
     const perCourseNotify: boolean = settings?.per_course_notify ?? false;
     const notifyAnnouncements: boolean = settings?.notify_announcements ?? true;
     const notifyMaterials: boolean = settings?.notify_materials ?? true;
+    const discordUserId: string | null = settings?.discord_user_id ?? null;
+
+    if (!discordUserId) continue;
 
     const coursesRes = await fetch(
       "https://classroom.googleapis.com/v1/courses?courseStates=ACTIVE",
@@ -133,6 +136,7 @@ export async function GET(request: Request) {
               reminderMinutes,
               accessToken,
               driveFileIds,
+              discord_user_id: discordUserId,
             }),
           }).catch((e) => console.error("Cloud Run error:", e));
         }
@@ -173,6 +177,7 @@ export async function GET(request: Request) {
                   course_name: course.name,
                   due: dueWithTime.toISOString(),
                   notification_type: "24h",
+                  discord_user_id: discordUserId,
                 }),
               }).catch((e) => console.error("Cloud Run 24h error:", e));
             }
@@ -202,6 +207,7 @@ export async function GET(request: Request) {
                   course_name: course.name,
                   due: dueWithTime.toISOString(),
                   notification_type: "reminder",
+                  discord_user_id: discordUserId,
                 }),
               }).catch((e) => console.error("Cloud Run reminder error:", e));
             }
@@ -243,7 +249,7 @@ export async function GET(request: Request) {
             fetch(`${process.env.CLOUD_RUN_URL}/process-announcement`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ announcement, course, user_id: user.user_id }),
+              body: JSON.stringify({ announcement, course, user_id: user.user_id, discord_user_id: discordUserId }),
             }).catch((e) => console.error("Cloud Run announcement error:", e));
           }
         }
@@ -290,7 +296,7 @@ export async function GET(request: Request) {
             fetch(`${process.env.CLOUD_RUN_URL}/process-material`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ material, course, user_id: user.user_id, accessToken, driveFileIds }),
+              body: JSON.stringify({ material, course, user_id: user.user_id, accessToken, driveFileIds, discord_user_id: discordUserId }),
             }).catch((e) => console.error("Cloud Run material error:", e));
           }
         }
@@ -374,6 +380,7 @@ export async function GET(request: Request) {
             body: JSON.stringify({
               assignment: { id: assignmentId, title: template.title, course_name: template.course_name, due_date: dueDateStr, due_time: template.due_time ?? "23:59" },
               reminderType: "new",
+              discord_user_id: discordUserId,
             }),
           }).catch((e) => console.error("Cloud Run recurring new error:", e));
         }
@@ -417,7 +424,7 @@ export async function GET(request: Request) {
             fetch(`${process.env.CLOUD_RUN_URL}/process-custom-reminder`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ assignment, reminderType: "24h" }),
+              body: JSON.stringify({ assignment, reminderType: "24h", discord_user_id: discordUserId }),
             }).catch((e) => console.error("Cloud Run custom reminder error:", e));
           }
         }
@@ -442,7 +449,7 @@ export async function GET(request: Request) {
             fetch(`${process.env.CLOUD_RUN_URL}/process-custom-reminder`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ assignment, reminderType: "reminder", reminderMinutes }),
+              body: JSON.stringify({ assignment, reminderType: "reminder", reminderMinutes, discord_user_id: discordUserId }),
             }).catch((e) => console.error("Cloud Run custom reminder error:", e));
           }
         }
