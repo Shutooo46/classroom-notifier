@@ -72,8 +72,8 @@ type UserSettings = {
 
 // ---- 期限バッジ ----
 function UrgencyBadge({ dueDate, submitted }: { dueDate?: Assignment["dueDate"]; submitted: boolean }) {
-  if (submitted) return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-400 font-pixel" style={{ fontSize: "7px" }}>DONE</span>;
-  if (!dueDate) return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-500 font-pixel" style={{ fontSize: "7px" }}>NO DUE</span>;
+  if (submitted) return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 dark:bg-[#333] text-gray-400 font-pixel" style={{ fontSize: "7px" }}>DONE</span>;
+  if (!dueDate) return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 dark:bg-[#333] text-gray-500 font-pixel" style={{ fontSize: "7px" }}>NO DUE</span>;
 
   const now = new Date();
   const due = new Date(dueDate.year, dueDate.month - 1, dueDate.day);
@@ -170,10 +170,10 @@ function AddCustomAssignmentModal({ onClose, onAdd, defaultCourseName }: {
 
   return (
     <div style={{ backgroundColor: "rgba(0,0,0,0.5)" }} className="fixed inset-0 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-80 border-2 border-black shadow-[6px_6px_0px_#1a1a1a] max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between p-6 pb-4 border-b-2 border-black">
-          <p className="font-pixel text-black" style={{ fontSize: "9px" }}>ADD TASK</p>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg border-2 border-black hover:bg-gray-100 font-bold text-sm">✕</button>
+      <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl w-80 border-2 border-black dark:border-[#555] shadow-[6px_6px_0px_#1a1a1a] dark:shadow-[6px_6px_0px_#555] max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-6 pb-4 border-b-2 border-black dark:border-[#555]">
+          <p className="font-pixel text-black dark:text-white" style={{ fontSize: "9px" }}>ADD TASK</p>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg border-2 border-black dark:border-[#555] hover:bg-gray-100 dark:hover:bg-[#333] font-bold text-sm dark:text-white">✕</button>
         </div>
         <div className="overflow-y-auto flex-1 p-6 space-y-3">
           <div>
@@ -184,7 +184,7 @@ function AddCustomAssignmentModal({ onClose, onAdd, defaultCourseName }: {
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && save()}
               placeholder="課題タイトル"
-              className="w-full border-2 border-black rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-black"
+              className="w-full border-2 border-black dark:border-[#555] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-black dark:bg-[#2a2a2a] dark:text-white"
             />
           </div>
           <div>
@@ -194,7 +194,7 @@ function AddCustomAssignmentModal({ onClose, onAdd, defaultCourseName }: {
               onChange={(e) => { if (!locked) setCourseName(e.target.value); }}
               readOnly={locked}
               placeholder="授業名（省略可）"
-              className={`w-full border-2 border-black rounded-xl px-3 py-2 text-sm focus:outline-none ${locked ? "bg-gray-50 text-gray-500 cursor-default" : ""}`}
+              className={`w-full border-2 border-black dark:border-[#555] rounded-xl px-3 py-2 text-sm focus:outline-none dark:bg-[#2a2a2a] dark:text-white ${locked ? "bg-gray-50 dark:bg-[#2a2a2a] text-gray-500 cursor-default" : ""}`}
             />
           </div>
           <div>
@@ -223,8 +223,8 @@ function AddCustomAssignmentModal({ onClose, onAdd, defaultCourseName }: {
             )}
           </div>
         </div>
-        <div className="flex gap-3 p-6 pt-4 border-t-2 border-black">
-          <button onClick={onClose} className="flex-1 border-2 border-black py-2 rounded-xl text-sm font-semibold hover:bg-gray-100">
+        <div className="flex gap-3 p-6 pt-4 border-t-2 border-black dark:border-[#555]">
+          <button onClick={onClose} className="flex-1 border-2 border-black dark:border-[#555] py-2 rounded-xl text-sm font-semibold hover:bg-gray-100 dark:hover:bg-[#333] dark:text-white">
             キャンセル
           </button>
           <button
@@ -250,11 +250,11 @@ function CustomAssignmentCard({ assignment, onToggle, onDelete }: {
 
   const cardBase = "rounded-2xl p-4 mb-2 flex items-start justify-between transition-all border-dashed border-2";
   const cardStyle: Record<string, string> = {
-    done: `${cardBase} border-black bg-gray-100 shadow-[3px_3px_0px_#1a1a1a] opacity-60`,
-    high: `${cardBase} border-black bg-white shadow-[3px_3px_0px_#1a1a1a] border-l-[6px] border-l-[#ff6b6b]`,
-    mid:  `${cardBase} border-black bg-white shadow-[3px_3px_0px_#1a1a1a] border-l-[6px] border-l-[#c8f135]`,
-    low:  `${cardBase} border-black bg-white shadow-[3px_3px_0px_#1a1a1a] border-l-[6px] border-l-[#7dd3fc]`,
-    none: `${cardBase} border-black bg-white shadow-[3px_3px_0px_#1a1a1a]`,
+    done: `${cardBase} border-black dark:border-[#555] bg-gray-100 dark:bg-[#2a2a2a] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] opacity-60`,
+    high: `${cardBase} border-black dark:border-[#555] bg-white dark:bg-[#1e1e1e] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#ff6b6b]`,
+    mid:  `${cardBase} border-black dark:border-[#555] bg-white dark:bg-[#1e1e1e] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#c8f135]`,
+    low:  `${cardBase} border-black dark:border-[#555] bg-white dark:bg-[#1e1e1e] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#7dd3fc]`,
+    none: `${cardBase} border-black dark:border-[#555] bg-white dark:bg-[#1e1e1e] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555]`,
   };
 
   const dueLabel = assignment.due_date
@@ -275,7 +275,7 @@ function CustomAssignmentCard({ assignment, onToggle, onDelete }: {
           )}
         </button>
         <div className="min-w-0">
-          <p className={`text-sm font-semibold truncate ${assignment.submitted ? "text-gray-400 line-through" : "text-black"}`}>
+          <p className={`text-sm font-semibold truncate ${assignment.submitted ? "text-gray-400 line-through" : "text-black dark:text-white"}`}>
             {assignment.title}
           </p>
           <p className="text-xs text-gray-500 mt-0.5 truncate">{assignment.course_name}</p>
@@ -325,8 +325,8 @@ function AddCustomCourseModal({ onClose, onAdd }: {
 
   return (
     <div style={{ backgroundColor: "rgba(0,0,0,0.5)" }} className="fixed inset-0 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl w-80 border-2 border-black shadow-[6px_6px_0px_#1a1a1a] p-6">
-        <p className="font-pixel text-black mb-5" style={{ fontSize: "9px" }}>ADD COURSE</p>
+      <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl w-80 border-2 border-black dark:border-[#555] shadow-[6px_6px_0px_#1a1a1a] dark:shadow-[6px_6px_0px_#555] p-6">
+        <p className="font-pixel text-black dark:text-white mb-5" style={{ fontSize: "9px" }}>ADD COURSE</p>
         <div>
           <p className="font-pixel text-gray-500 mb-1" style={{ fontSize: "7px" }}>COURSE NAME *</p>
           <input
@@ -335,11 +335,11 @@ function AddCustomCourseModal({ onClose, onAdd }: {
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && save()}
             placeholder="授業名"
-            className="w-full border-2 border-black rounded-xl px-3 py-2 text-sm focus:outline-none"
+            className="w-full border-2 border-black dark:border-[#555] rounded-xl px-3 py-2 text-sm focus:outline-none dark:bg-[#2a2a2a] dark:text-white"
           />
         </div>
         <div className="flex gap-3 mt-5">
-          <button onClick={onClose} className="flex-1 border-2 border-black py-2 rounded-xl text-sm font-semibold hover:bg-gray-100">
+          <button onClick={onClose} className="flex-1 border-2 border-black dark:border-[#555] py-2 rounded-xl text-sm font-semibold hover:bg-gray-100 dark:hover:bg-[#333] dark:text-white">
             キャンセル
           </button>
           <button
@@ -434,10 +434,10 @@ function AddRecurringAssignmentModal({ onClose, onAdd, onAddAssignments, default
 
   return (
     <div style={{ backgroundColor: "rgba(0,0,0,0.5)" }} className="fixed inset-0 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-80 border-2 border-black shadow-[6px_6px_0px_#1a1a1a] max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between p-6 pb-4 border-b-2 border-black">
-          <p className="font-pixel text-black" style={{ fontSize: "9px" }}>ADD RECURRING</p>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg border-2 border-black hover:bg-gray-100 font-bold text-sm">✕</button>
+      <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl w-80 border-2 border-black dark:border-[#555] shadow-[6px_6px_0px_#1a1a1a] dark:shadow-[6px_6px_0px_#555] max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-6 pb-4 border-b-2 border-black dark:border-[#555]">
+          <p className="font-pixel text-black dark:text-white" style={{ fontSize: "9px" }}>ADD RECURRING</p>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg border-2 border-black dark:border-[#555] hover:bg-gray-100 dark:hover:bg-[#333] font-bold text-sm dark:text-white">✕</button>
         </div>
         <div className="overflow-y-auto flex-1 p-6 space-y-4">
           <div>
@@ -448,13 +448,13 @@ function AddRecurringAssignmentModal({ onClose, onAdd, onAddAssignments, default
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && save()}
               placeholder="課題タイトル"
-              className="w-full border-2 border-black rounded-xl px-3 py-2 text-sm focus:outline-none"
+              className="w-full border-2 border-black dark:border-[#555] rounded-xl px-3 py-2 text-sm focus:outline-none dark:bg-[#2a2a2a] dark:text-white"
             />
           </div>
           {defaultCourseName && (
             <div>
               <p className="font-pixel text-gray-500 mb-1" style={{ fontSize: "7px" }}>COURSE</p>
-              <p className="text-sm font-semibold text-gray-500 px-3 py-2 bg-gray-50 rounded-xl border-2 border-black">{defaultCourseName}</p>
+              <p className="text-sm font-semibold text-gray-500 px-3 py-2 bg-gray-50 dark:bg-[#2a2a2a] rounded-xl border-2 border-black dark:border-[#555]">{defaultCourseName}</p>
             </div>
           )}
           <div>
@@ -464,7 +464,7 @@ function AddRecurringAssignmentModal({ onClose, onAdd, onAddAssignments, default
                 <button
                   key={i}
                   onClick={() => setDayOfWeek(i)}
-                  className={`flex-1 py-1.5 rounded-lg border-2 text-xs font-bold transition-colors ${dayOfWeek === i ? "bg-black text-[#c8f135] border-black" : "bg-white text-black border-black hover:bg-gray-100"}`}
+                  className={`flex-1 py-1.5 rounded-lg border-2 text-xs font-bold transition-colors ${dayOfWeek === i ? "bg-black text-[#c8f135] border-black" : "bg-white dark:bg-[#2a2a2a] text-black dark:text-white border-black dark:border-[#555] hover:bg-gray-100 dark:hover:bg-[#333]"}`}
                 >
                   {label}
                 </button>
@@ -473,18 +473,18 @@ function AddRecurringAssignmentModal({ onClose, onAdd, onAddAssignments, default
           </div>
           <div>
             <p className="font-pixel text-gray-500 mb-1.5" style={{ fontSize: "7px" }}>提出期限（出題日から何日後？）</p>
-            <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2 border-2 border-black">
+            <div className="flex items-center gap-3 bg-gray-50 dark:bg-[#2a2a2a] rounded-xl px-3 py-2 border-2 border-black dark:border-[#555]">
               <button
                 onClick={() => setDueDaysOffset((v) => Math.max(0, v - 1))}
-                className="w-8 h-8 rounded-lg border-2 border-black bg-white font-bold text-lg flex items-center justify-center hover:bg-gray-100 flex-shrink-0"
+                className="w-8 h-8 rounded-lg border-2 border-black dark:border-[#555] bg-white dark:bg-[#333] font-bold text-lg flex items-center justify-center hover:bg-gray-100 dark:hover:bg-[#444] flex-shrink-0 dark:text-white"
               >−</button>
               <div className="flex-1 text-center">
-                <p className="text-xl font-bold text-black">{dueDaysOffset}<span className="text-sm ml-0.5">日後</span></p>
+                <p className="text-xl font-bold text-black dark:text-white">{dueDaysOffset}<span className="text-sm ml-0.5">日後</span></p>
                 <p className="text-xs text-gray-400">{DAY_LABELS[nextDue.getDay()]}曜日が期限</p>
               </div>
               <button
                 onClick={() => setDueDaysOffset((v) => Math.min(30, v + 1))}
-                className="w-8 h-8 rounded-lg border-2 border-black bg-white font-bold text-lg flex items-center justify-center hover:bg-gray-100 flex-shrink-0"
+                className="w-8 h-8 rounded-lg border-2 border-black dark:border-[#555] bg-white dark:bg-[#333] font-bold text-lg flex items-center justify-center hover:bg-gray-100 dark:hover:bg-[#444] flex-shrink-0 dark:text-white"
               >+</button>
             </div>
           </div>
@@ -495,7 +495,7 @@ function AddRecurringAssignmentModal({ onClose, onAdd, onAddAssignments, default
                 <button
                   key={val}
                   onClick={() => setIntervalWeeks(val)}
-                  className={`flex-1 py-2 rounded-xl border-2 text-sm font-semibold transition-colors ${intervalWeeks === val ? "bg-black text-[#c8f135] border-black" : "bg-white text-black border-black hover:bg-gray-100"}`}
+                  className={`flex-1 py-2 rounded-xl border-2 text-sm font-semibold transition-colors ${intervalWeeks === val ? "bg-black text-[#c8f135] border-black" : "bg-white dark:bg-[#2a2a2a] text-black dark:text-white border-black dark:border-[#555] hover:bg-gray-100 dark:hover:bg-[#333]"}`}
                 >
                   {label}
                 </button>
@@ -510,20 +510,20 @@ function AddRecurringAssignmentModal({ onClose, onAdd, onAddAssignments, default
               <PickerColumn values={minValues} selected={dueMinute} onChange={setDueMinute} label="分" />
             </div>
           </div>
-          <div className="bg-gray-50 rounded-xl px-3 py-2.5 border-2 border-black space-y-1">
+          <div className="bg-gray-50 dark:bg-[#2a2a2a] rounded-xl px-3 py-2.5 border-2 border-black dark:border-[#555] space-y-1">
             <div className="flex items-center justify-between">
               <span className="font-pixel text-gray-400" style={{ fontSize: "6px" }}>出題</span>
-              <span className="text-xs font-semibold text-gray-600">{assignedLabel}</span>
+              <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">{assignedLabel}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="font-pixel text-[#ff6b6b]" style={{ fontSize: "6px" }}>期限</span>
-              <span className="text-xs font-bold text-black">{dueLabel} {dueTimeStr}</span>
+              <span className="text-xs font-bold text-black dark:text-white">{dueLabel} {dueTimeStr}</span>
             </div>
           </div>
           {errorMsg && <p className="text-xs text-red-500 font-semibold">{errorMsg}</p>}
         </div>
-        <div className="flex gap-3 p-6 pt-4 border-t-2 border-black">
-          <button onClick={onClose} className="flex-1 border-2 border-black py-2 rounded-xl text-sm font-semibold hover:bg-gray-100">
+        <div className="flex gap-3 p-6 pt-4 border-t-2 border-black dark:border-[#555]">
+          <button onClick={onClose} className="flex-1 border-2 border-black dark:border-[#555] py-2 rounded-xl text-sm font-semibold hover:bg-gray-100 dark:hover:bg-[#333] dark:text-white">
             キャンセル
           </button>
           <button
@@ -588,10 +588,10 @@ function EditRecurringAssignmentModal({ recurring, onClose, onSave }: {
 
   return (
     <div style={{ backgroundColor: "rgba(0,0,0,0.5)" }} className="fixed inset-0 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-80 border-2 border-black shadow-[6px_6px_0px_#1a1a1a] max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between p-6 pb-4 border-b-2 border-black">
-          <p className="font-pixel text-black" style={{ fontSize: "9px" }}>EDIT RECURRING</p>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg border-2 border-black hover:bg-gray-100 font-bold text-sm">✕</button>
+      <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl w-80 border-2 border-black dark:border-[#555] shadow-[6px_6px_0px_#1a1a1a] dark:shadow-[6px_6px_0px_#555] max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-6 pb-4 border-b-2 border-black dark:border-[#555]">
+          <p className="font-pixel text-black dark:text-white" style={{ fontSize: "9px" }}>EDIT RECURRING</p>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg border-2 border-black dark:border-[#555] hover:bg-gray-100 dark:hover:bg-[#333] font-bold text-sm dark:text-white">✕</button>
         </div>
         <div className="overflow-y-auto flex-1 p-6 space-y-4">
           <div>
@@ -601,19 +601,19 @@ function EditRecurringAssignmentModal({ recurring, onClose, onSave }: {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="課題タイトル"
-              className="w-full border-2 border-black rounded-xl px-3 py-2 text-sm focus:outline-none"
+              className="w-full border-2 border-black dark:border-[#555] rounded-xl px-3 py-2 text-sm focus:outline-none dark:bg-[#2a2a2a] dark:text-white"
             />
           </div>
           <div>
             <p className="font-pixel text-gray-500 mb-1" style={{ fontSize: "7px" }}>COURSE</p>
-            <p className="text-sm font-semibold text-gray-500 px-3 py-2 bg-gray-50 rounded-xl border-2 border-black">{recurring.course_name}</p>
+            <p className="text-sm font-semibold text-gray-500 px-3 py-2 bg-gray-50 dark:bg-[#2a2a2a] rounded-xl border-2 border-black dark:border-[#555]">{recurring.course_name}</p>
           </div>
           <div>
             <p className="font-pixel text-gray-500 mb-1.5" style={{ fontSize: "7px" }}>出題される曜日</p>
             <div className="flex gap-1">
               {DAY_LABELS.map((label, i) => (
                 <button key={i} onClick={() => setDayOfWeek(i)}
-                  className={`flex-1 py-1.5 rounded-lg border-2 text-xs font-bold transition-colors ${dayOfWeek === i ? "bg-black text-[#c8f135] border-black" : "bg-white text-black border-black hover:bg-gray-100"}`}>
+                  className={`flex-1 py-1.5 rounded-lg border-2 text-xs font-bold transition-colors ${dayOfWeek === i ? "bg-black text-[#c8f135] border-black" : "bg-white dark:bg-[#2a2a2a] text-black dark:text-white border-black dark:border-[#555] hover:bg-gray-100 dark:hover:bg-[#333]"}`}>
                   {label}
                 </button>
               ))}
@@ -621,15 +621,15 @@ function EditRecurringAssignmentModal({ recurring, onClose, onSave }: {
           </div>
           <div>
             <p className="font-pixel text-gray-500 mb-1.5" style={{ fontSize: "7px" }}>提出期限（出題日から何日後？）</p>
-            <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2 border-2 border-black">
+            <div className="flex items-center gap-3 bg-gray-50 dark:bg-[#2a2a2a] rounded-xl px-3 py-2 border-2 border-black dark:border-[#555]">
               <button onClick={() => setDueDaysOffset((v) => Math.max(0, v - 1))}
-                className="w-8 h-8 rounded-lg border-2 border-black bg-white font-bold text-lg flex items-center justify-center hover:bg-gray-100 flex-shrink-0">−</button>
+                className="w-8 h-8 rounded-lg border-2 border-black dark:border-[#555] bg-white dark:bg-[#333] font-bold text-lg flex items-center justify-center hover:bg-gray-100 dark:hover:bg-[#444] flex-shrink-0 dark:text-white">−</button>
               <div className="flex-1 text-center">
-                <p className="text-xl font-bold text-black">{dueDaysOffset}<span className="text-sm ml-0.5">日後</span></p>
+                <p className="text-xl font-bold text-black dark:text-white">{dueDaysOffset}<span className="text-sm ml-0.5">日後</span></p>
                 <p className="text-xs text-gray-400">{DAY_LABELS[nextDue.getDay()]}曜日が期限</p>
               </div>
               <button onClick={() => setDueDaysOffset((v) => Math.min(30, v + 1))}
-                className="w-8 h-8 rounded-lg border-2 border-black bg-white font-bold text-lg flex items-center justify-center hover:bg-gray-100 flex-shrink-0">+</button>
+                className="w-8 h-8 rounded-lg border-2 border-black dark:border-[#555] bg-white dark:bg-[#333] font-bold text-lg flex items-center justify-center hover:bg-gray-100 dark:hover:bg-[#444] flex-shrink-0 dark:text-white">+</button>
             </div>
           </div>
           <div>
@@ -637,7 +637,7 @@ function EditRecurringAssignmentModal({ recurring, onClose, onSave }: {
             <div className="flex gap-2">
               {[{ label: "毎週", val: 1 }, { label: "2週ごと", val: 2 }].map(({ label, val }) => (
                 <button key={val} onClick={() => setIntervalWeeks(val)}
-                  className={`flex-1 py-2 rounded-xl border-2 text-sm font-semibold transition-colors ${intervalWeeks === val ? "bg-black text-[#c8f135] border-black" : "bg-white text-black border-black hover:bg-gray-100"}`}>
+                  className={`flex-1 py-2 rounded-xl border-2 text-sm font-semibold transition-colors ${intervalWeeks === val ? "bg-black text-[#c8f135] border-black" : "bg-white dark:bg-[#2a2a2a] text-black dark:text-white border-black dark:border-[#555] hover:bg-gray-100 dark:hover:bg-[#333]"}`}>
                   {label}
                 </button>
               ))}
@@ -651,21 +651,21 @@ function EditRecurringAssignmentModal({ recurring, onClose, onSave }: {
               <PickerColumn values={minValues} selected={dueMinute} onChange={setDueMinute} label="分" />
             </div>
           </div>
-          <div className="bg-gray-50 rounded-xl px-3 py-2.5 border-2 border-black space-y-1">
+          <div className="bg-gray-50 dark:bg-[#2a2a2a] rounded-xl px-3 py-2.5 border-2 border-black dark:border-[#555] space-y-1">
             <div className="flex items-center justify-between">
               <span className="font-pixel text-gray-400" style={{ fontSize: "6px" }}>出題</span>
-              <span className="text-xs font-semibold text-gray-600">{assignedLabel}</span>
+              <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">{assignedLabel}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="font-pixel text-[#ff6b6b]" style={{ fontSize: "6px" }}>期限</span>
-              <span className="text-xs font-bold text-black">{dueLabel} {dueTimeStr}</span>
+              <span className="text-xs font-bold text-black dark:text-white">{dueLabel} {dueTimeStr}</span>
             </div>
           </div>
           <p className="text-xs text-gray-400">※ 次回の出題曜日から新しい設定が反映されます</p>
           {errorMsg && <p className="text-xs text-red-500 font-semibold">{errorMsg}</p>}
         </div>
-        <div className="flex gap-3 p-6 pt-4 border-t-2 border-black">
-          <button onClick={onClose} className="flex-1 border-2 border-black py-2 rounded-xl text-sm font-semibold hover:bg-gray-100">キャンセル</button>
+        <div className="flex gap-3 p-6 pt-4 border-t-2 border-black dark:border-[#555]">
+          <button onClick={onClose} className="flex-1 border-2 border-black dark:border-[#555] py-2 rounded-xl text-sm font-semibold hover:bg-gray-100 dark:hover:bg-[#333] dark:text-white">キャンセル</button>
           <button onClick={save} disabled={saving || !title.trim()}
             className="flex-1 border-2 border-black py-2 rounded-xl text-sm font-semibold bg-black text-[#c8f135] hover:opacity-90 disabled:opacity-40">
             {saving ? "..." : "上書き保存"}
@@ -688,10 +688,10 @@ function RecurringAssignmentRow({ recurring, onDelete, onToggle, onEdit }: {
   const dueDayLabel = offsetLabel(recurring.due_days_offset);
 
   return (
-    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-dashed border-black mb-1.5 ${recurring.active ? "bg-white" : "bg-gray-50 opacity-60"}`}>
+    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-dashed border-black dark:border-[#555] mb-1.5 ${recurring.active ? "bg-white dark:bg-[#1e1e1e]" : "bg-gray-50 dark:bg-[#2a2a2a] opacity-60"}`}>
       <span className="text-sm">🔄</span>
       <div className="flex-1 min-w-0">
-        <p className={`text-xs font-semibold truncate ${recurring.active ? "text-black" : "text-gray-400"}`}>{recurring.title}</p>
+        <p className={`text-xs font-semibold truncate ${recurring.active ? "text-black dark:text-white" : "text-gray-400"}`}>{recurring.title}</p>
         <p className="font-pixel text-gray-400" style={{ fontSize: "6px" }}>
           {intervalLabel}{assignedDayLabel}曜日出題 → {dueDayLabel}期限 {recurring.due_time !== "23:59" ? recurring.due_time : ""}
         </p>
@@ -730,10 +730,10 @@ function CustomCourseCard({ course, pendingCount, onOpen, onDelete }: {
   }, [menuOpen]);
 
   return (
-    <div className="rounded-2xl p-4 mb-3 bg-white border-dashed border-2 border-black shadow-[4px_4px_0px_#1a1a1a] transition-all hover:shadow-[2px_2px_0px_#1a1a1a] hover:translate-x-0.5 hover:translate-y-0.5">
+    <div className="rounded-2xl p-4 mb-3 bg-white dark:bg-[#1e1e1e] border-dashed border-2 border-black dark:border-[#555] shadow-[4px_4px_0px_#1a1a1a] dark:shadow-[4px_4px_0px_#555] transition-all hover:shadow-[2px_2px_0px_#1a1a1a] dark:hover:shadow-[2px_2px_0px_#555] hover:translate-x-0.5 hover:translate-y-0.5">
       <div className="flex items-center justify-between">
         <div className="flex-1 min-w-0 cursor-pointer" onClick={onOpen}>
-          <p className="font-semibold text-black truncate text-sm">{course.name}</p>
+          <p className="font-semibold text-black dark:text-white truncate text-sm">{course.name}</p>
           <div className="flex items-center gap-2 mt-1.5">
             {pendingCount > 0 ? (
               <span className="font-pixel" style={{ fontSize: "7px", background: "#ffb3d9", color: "#1a1a1a", padding: "2px 8px", borderRadius: "999px" }}>
@@ -748,24 +748,24 @@ function CustomCourseCard({ course, pendingCount, onOpen, onDelete }: {
           <div className="relative" ref={menuRef}>
             <button
               onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
-              className="p-1.5 rounded-lg border-2 border-black bg-white hover:bg-gray-100 transition-colors"
+              className="p-1.5 rounded-lg border-2 border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] hover:bg-gray-100 dark:hover:bg-[#333] transition-colors"
             >
-              <svg className="w-4 h-4" fill="black" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 fill-black dark:fill-white" viewBox="0 0 24 24">
                 <circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" />
               </svg>
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-10 w-36 bg-white border-2 border-black rounded-xl shadow-[4px_4px_0px_#1a1a1a] z-10 py-1 overflow-hidden">
+              <div className="absolute right-0 top-10 w-36 bg-white dark:bg-[#2a2a2a] border-2 border-black dark:border-[#555] rounded-xl shadow-[4px_4px_0px_#1a1a1a] dark:shadow-[4px_4px_0px_#555] z-10 py-1 overflow-hidden">
                 <button
                   onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(); }}
-                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-50"
+                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
                 >
                   削除する
                 </button>
               </div>
             )}
           </div>
-          <button onClick={onOpen} className="p-1.5 rounded-lg border-2 border-black bg-white hover:bg-[#c8f135] transition-colors">
+          <button onClick={onOpen} className="p-1.5 rounded-lg border-2 border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] hover:bg-[#c8f135] transition-colors">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="black" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
@@ -781,19 +781,19 @@ function AssignmentCard({ assignment, userEmail }: { assignment: Assignment; use
   const urgency = getUrgency(assignment.dueDate, assignment.submitted);
 
   const cardStyle: Record<string, string> = {
-    done: "bg-gray-100 border-2 border-black shadow-[3px_3px_0px_#1a1a1a] opacity-60",
-    high: "bg-white border-2 border-black shadow-[3px_3px_0px_#1a1a1a] border-l-[6px] border-l-[#ff6b6b]",
-    mid: "bg-white border-2 border-black shadow-[3px_3px_0px_#1a1a1a] border-l-[6px] border-l-[#c8f135]",
-    low: "bg-white border-2 border-black shadow-[3px_3px_0px_#1a1a1a] border-l-[6px] border-l-[#7dd3fc]",
-    none: "bg-white border-2 border-black shadow-[3px_3px_0px_#1a1a1a]",
+    done: "bg-gray-100 dark:bg-[#2a2a2a] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] opacity-60",
+    high: "bg-white dark:bg-[#1e1e1e] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#ff6b6b]",
+    mid: "bg-white dark:bg-[#1e1e1e] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#c8f135]",
+    low: "bg-white dark:bg-[#1e1e1e] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#7dd3fc]",
+    none: "bg-white dark:bg-[#1e1e1e] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555]",
   };
 
   const titleStyle: Record<string, string> = {
     done: "text-gray-400 line-through",
-    high: "text-black",
-    mid: "text-black",
-    low: "text-black",
-    none: "text-black",
+    high: "text-black dark:text-white",
+    mid: "text-black dark:text-white",
+    low: "text-black dark:text-white",
+    none: "text-black dark:text-white",
   };
 
   const subStyle: Record<string, string> = {
@@ -806,18 +806,18 @@ function AssignmentCard({ assignment, userEmail }: { assignment: Assignment; use
 
   const checkStyle: Record<string, string> = {
     done: "bg-[#c8f135] border-black",
-    high: "bg-white border-black",
-    mid: "bg-white border-black",
-    low: "bg-white border-black",
-    none: "bg-white border-black",
+    high: "bg-white dark:bg-[#2a2a2a] border-black dark:border-[#555]",
+    mid: "bg-white dark:bg-[#2a2a2a] border-black dark:border-[#555]",
+    low: "bg-white dark:bg-[#2a2a2a] border-black dark:border-[#555]",
+    none: "bg-white dark:bg-[#2a2a2a] border-black dark:border-[#555]",
   };
 
   const openBtnStyle: Record<string, string> = {
-    done: "border-black bg-white text-black hover:bg-gray-200",
-    high: "border-black bg-white text-black hover:bg-[#c8f135]",
-    mid: "border-black bg-white text-black hover:bg-[#c8f135]",
-    low: "border-black bg-white text-black hover:bg-[#c8f135]",
-    none: "border-black bg-white text-black hover:bg-[#c8f135]",
+    done: "border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] text-black dark:text-white hover:bg-gray-200 dark:hover:bg-[#333]",
+    high: "border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] text-black dark:text-white hover:bg-[#c8f135]",
+    mid: "border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] text-black dark:text-white hover:bg-[#c8f135]",
+    low: "border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] text-black dark:text-white hover:bg-[#c8f135]",
+    none: "border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] text-black dark:text-white hover:bg-[#c8f135]",
   };
 
   const dateStyle: Record<string, string> = {
@@ -883,7 +883,7 @@ function Section({ title, assignments, customAssignments = [], onToggleCustom, o
         onClick={() => setOpen(!open)}
         className="flex items-center gap-2 w-full text-left mb-3 group"
       >
-        <span className="font-pixel text-black" style={{ fontSize: "9px" }}>{title.toUpperCase()}</span>
+        <span className="font-pixel text-black dark:text-white" style={{ fontSize: "9px" }}>{title.toUpperCase()}</span>
         <span className="text-xs bg-black text-[#c8f135] px-2 py-0.5 rounded-full font-pixel" style={{ fontSize: "7px" }}>{total}</span>
         <span className="ml-auto text-gray-400 text-xs">{open ? "▲" : "▼"}</span>
       </button>
@@ -916,11 +916,11 @@ function HideConfirmDialog({ courseName, onConfirm, onCancel }: {
 }) {
   return (
     <div style={{ backgroundColor: "rgba(0,0,0,0.5)" }} className="fixed inset-0 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl w-80 border-2 border-black shadow-[6px_6px_0px_#1a1a1a] p-6">
-        <p className="font-pixel text-black mb-2" style={{ fontSize: "9px" }}>HIDE COURSE?</p>
-        <p className="text-sm text-gray-600 mb-5 mt-3">「{courseName}」を非表示にしますか？設定から再表示できます。</p>
+      <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl w-80 border-2 border-black dark:border-[#555] shadow-[6px_6px_0px_#1a1a1a] dark:shadow-[6px_6px_0px_#555] p-6">
+        <p className="font-pixel text-black dark:text-white mb-2" style={{ fontSize: "9px" }}>HIDE COURSE?</p>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-5 mt-3">「{courseName}」を非表示にしますか？設定から再表示できます。</p>
         <div className="flex gap-3">
-          <button onClick={onCancel} className="flex-1 border-2 border-black py-2 rounded-xl text-sm font-semibold hover:bg-gray-100 transition-colors">
+          <button onClick={onCancel} className="flex-1 border-2 border-black dark:border-[#555] py-2 rounded-xl text-sm font-semibold hover:bg-gray-100 dark:hover:bg-[#333] dark:text-white transition-colors">
             キャンセル
           </button>
           <button onClick={onConfirm} className="flex-1 border-2 border-black py-2 rounded-xl text-sm font-semibold bg-black text-[#c8f135] hover:opacity-90 transition-opacity">
@@ -951,10 +951,10 @@ function CourseCard({
   }, [menuOpen]);
 
   return (
-    <div className="rounded-2xl p-4 mb-3 bg-white border-2 border-black shadow-[4px_4px_0px_#1a1a1a] transition-all hover:shadow-[2px_2px_0px_#1a1a1a] hover:translate-x-0.5 hover:translate-y-0.5">
+    <div className="rounded-2xl p-4 mb-3 bg-white dark:bg-[#1e1e1e] border-2 border-black dark:border-[#555] shadow-[4px_4px_0px_#1a1a1a] dark:shadow-[4px_4px_0px_#555] transition-all hover:shadow-[2px_2px_0px_#1a1a1a] dark:hover:shadow-[2px_2px_0px_#555] hover:translate-x-0.5 hover:translate-y-0.5">
       <div className="flex items-center justify-between">
         <div className="flex-1 min-w-0 cursor-pointer" onClick={onOpen}>
-          <p className="font-semibold text-black truncate text-sm">{course.name}</p>
+          <p className="font-semibold text-black dark:text-white truncate text-sm">{course.name}</p>
           <div className="flex items-center gap-2 mt-1.5">
             {pendingCount > 0 ? (
               <span className="font-pixel" style={{ fontSize: "7px", background: "#ffb3d9", color: "#1a1a1a", padding: "2px 8px", borderRadius: "999px" }}>
@@ -980,24 +980,24 @@ function CourseCard({
           <div className="relative" ref={menuRef}>
             <button
               onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
-              className="p-1.5 rounded-lg border-2 border-black bg-white hover:bg-gray-100 transition-colors"
+              className="p-1.5 rounded-lg border-2 border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] hover:bg-gray-100 dark:hover:bg-[#333] transition-colors"
             >
-              <svg className="w-4 h-4" fill="black" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 fill-black dark:fill-white" viewBox="0 0 24 24">
                 <circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" />
               </svg>
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-10 w-36 bg-white border-2 border-black rounded-xl shadow-[4px_4px_0px_#1a1a1a] z-10 py-1 overflow-hidden">
+              <div className="absolute right-0 top-10 w-36 bg-white dark:bg-[#2a2a2a] border-2 border-black dark:border-[#555] rounded-xl shadow-[4px_4px_0px_#1a1a1a] dark:shadow-[4px_4px_0px_#555] z-10 py-1 overflow-hidden">
                 <button
                   onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onHide(); }}
-                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-50"
+                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
                 >
                   非表示にする
                 </button>
               </div>
             )}
           </div>
-          <button onClick={onOpen} className="p-1.5 rounded-lg border-2 border-black bg-white hover:bg-[#c8f135] transition-colors">
+          <button onClick={onOpen} className="p-1.5 rounded-lg border-2 border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] hover:bg-[#c8f135] transition-colors">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="black" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
@@ -1042,18 +1042,20 @@ function PickerColumn({ values, selected, onChange, label }: {
           <div style={{ height: itemHeight }} />
         </div>
       </div>
-      <span className="font-pixel text-gray-500 mt-2" style={{ fontSize: "8px" }}>{label.toUpperCase()}</span>
+      <span className="font-pixel text-gray-500 dark:text-gray-400 mt-2" style={{ fontSize: "8px" }}>{label.toUpperCase()}</span>
     </div>
   );
 }
 
 // ---- 設定モーダル ----
-function SettingsModal({ onClose, courses, settings, onSave, userEmail }: {
+function SettingsModal({ onClose, courses, settings, onSave, userEmail, theme, onThemeChange }: {
   onClose: () => void; courses: Course[]; settings: UserSettings;
   onSave: (patch: Partial<UserSettings>) => Promise<void>;
   userEmail: string;
+  theme: "light" | "dark" | "system";
+  onThemeChange: (t: "light" | "dark" | "system") => void;
 }) {
-  const [activeSection, setActiveSection] = useState<null | "account" | "notifications" | "display">(null);
+  const [activeSection, setActiveSection] = useState<null | "account" | "notifications" | "display" | "theme">(null);
   const [hours, setHours] = useState(Math.floor(settings.reminder_minutes / 60));
   const [mins, setMins] = useState(settings.reminder_minutes % 60);
   const [perCourseNotify, setPerCourseNotify] = useState(settings.per_course_notify);
@@ -1089,38 +1091,39 @@ function SettingsModal({ onClose, courses, settings, onSave, userEmail }: {
   const hourValues = Array.from({ length: 24 }, (_, i) => String(i));
   const minValues = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
 
-  const sectionTitle: Record<string, string> = { account: "アカウント", notifications: "通知", display: "表示" };
+  const sectionTitle: Record<string, string> = { account: "アカウント", notifications: "通知", display: "表示", theme: "テーマ" };
 
   return (
     <div style={{ backgroundColor: "rgba(0,0,0,0.5)" }} className="fixed inset-0 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl w-96 border-2 border-black shadow-[6px_6px_0px_#1a1a1a] max-h-[85vh] flex flex-col">
-        <div className="flex items-center justify-between p-6 pb-4 border-b-2 border-black">
+      <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl w-96 border-2 border-black dark:border-[#555] shadow-[6px_6px_0px_#1a1a1a] dark:shadow-[6px_6px_0px_#555] max-h-[85vh] flex flex-col">
+        <div className="flex items-center justify-between p-6 pb-4 border-b-2 border-black dark:border-[#555]">
           {activeSection ? (
-            <button onClick={() => setActiveSection(null)} className="flex items-center gap-1.5 text-sm font-semibold hover:opacity-70 transition-opacity">
+            <button onClick={() => setActiveSection(null)} className="flex items-center gap-1.5 text-sm font-semibold hover:opacity-70 transition-opacity dark:text-white">
               <span className="text-base">‹</span>
               <span className="font-pixel" style={{ fontSize: "10px" }}>{sectionTitle[activeSection]}</span>
             </button>
           ) : (
-            <p className="font-pixel text-black" style={{ fontSize: "10px" }}>SETTINGS</p>
+            <p className="font-pixel text-black dark:text-white" style={{ fontSize: "10px" }}>SETTINGS</p>
           )}
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg border-2 border-black hover:bg-gray-100 font-bold text-sm">✕</button>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg border-2 border-black dark:border-[#555] hover:bg-gray-100 dark:hover:bg-[#333] font-bold text-sm dark:text-white">✕</button>
         </div>
 
         <div className="overflow-y-auto flex-1">
           {!activeSection && (
-            <div className="divide-y-2 divide-black">
+            <div className="divide-y-2 divide-black dark:divide-[#555]">
               {[
                 { key: "account", label: "アカウント", sub: userEmail },
                 { key: "notifications", label: "通知", sub: "リマインド・通知設定" },
                 { key: "display", label: "表示", sub: "非表示コース" },
+                { key: "theme", label: "テーマ", sub: "ライト / ダーク / システム" },
               ].map(({ key, label, sub }) => (
                 <button
                   key={key}
-                  onClick={() => setActiveSection(key as "account" | "notifications" | "display")}
-                  className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors text-left"
+                  onClick={() => setActiveSection(key as "account" | "notifications" | "display" | "theme")}
+                  className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors text-left"
                 >
                   <div>
-                    <p className="text-sm font-semibold text-black">{label}</p>
+                    <p className="text-sm font-semibold text-black dark:text-white">{label}</p>
                     <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[260px]">{sub}</p>
                   </div>
                   <span className="text-gray-300 text-lg">›</span>
@@ -1132,19 +1135,19 @@ function SettingsModal({ onClose, courses, settings, onSave, userEmail }: {
           {activeSection === "account" && (
             <div className="p-6 space-y-6">
               <div>
-                <p className="font-pixel text-black mb-3" style={{ fontSize: "8px" }}>GOOGLE</p>
-                <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                <p className="font-pixel text-black dark:text-white mb-3" style={{ fontSize: "8px" }}>GOOGLE</p>
+                <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-[#333]">
                   <div>
-                    <p className="text-sm font-semibold text-black">Googleアカウント</p>
+                    <p className="text-sm font-semibold text-black dark:text-white">Googleアカウント</p>
                     <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[240px]">{userEmail}</p>
                   </div>
                 </div>
               </div>
               <div>
-                <p className="font-pixel text-black mb-3" style={{ fontSize: "8px" }}>DISCORD</p>
-                <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                <p className="font-pixel text-black dark:text-white mb-3" style={{ fontSize: "8px" }}>DISCORD</p>
+                <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-[#333]">
                   <div>
-                    <p className="text-sm font-semibold text-black">Discord DM通知</p>
+                    <p className="text-sm font-semibold text-black dark:text-white">Discord DM通知</p>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {settings.discord_user_id ? <span>連携済み <span className="text-[#c8f135]">✓</span></span> : "未連携"}
                     </p>
@@ -1173,9 +1176,9 @@ function SettingsModal({ onClose, courses, settings, onSave, userEmail }: {
           {activeSection === "notifications" && (
             <div className="p-6 space-y-6">
               <div>
-                <p className="font-pixel text-black mb-1" style={{ fontSize: "8px" }}>REMINDER TIMING</p>
+                <p className="font-pixel text-black dark:text-white mb-1" style={{ fontSize: "8px" }}>REMINDER TIMING</p>
                 <p className="text-xs text-gray-400 mb-4">期限の何時間・何分前に通知するか</p>
-                <div className="flex items-center justify-center gap-4 bg-gray-50 rounded-2xl py-4 px-6 border-2 border-black">
+                <div className="flex items-center justify-center gap-4 bg-gray-50 dark:bg-[#2a2a2a] rounded-2xl py-4 px-6 border-2 border-black dark:border-[#555]">
                   <PickerColumn values={hourValues} selected={hours} onChange={setHours} label="時間" />
                   <span className="font-pixel text-white mb-6" style={{ fontSize: "20px" }}>:</span>
                   <PickerColumn values={minValues} selected={mins} onChange={setMins} label="分" />
@@ -1183,16 +1186,16 @@ function SettingsModal({ onClose, courses, settings, onSave, userEmail }: {
                 <p className="text-xs text-gray-400 mt-2">※新しく追加された課題から適用されます</p>
               </div>
               <div>
-                <p className="font-pixel text-black mb-3" style={{ fontSize: "8px" }}>NOTIFICATIONS</p>
+                <p className="font-pixel text-black dark:text-white mb-3" style={{ fontSize: "8px" }}>NOTIFICATIONS</p>
                 <div className="space-y-3">
                   {[
                     { label: "授業別に通知設定する", sub: "オフにすると全授業で通知", val: perCourseNotify, set: setPerCourseNotify },
                     { label: "お知らせ通知", sub: null, val: notifyAnnouncements, set: setNotifyAnnouncements },
                     { label: "資料投稿通知", sub: null, val: notifyMaterials, set: setNotifyMaterials },
                   ].map(({ label, sub, val, set }) => (
-                    <div key={label} className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <div key={label} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-[#333]">
                       <div>
-                        <p className="text-sm font-semibold text-black">{label}</p>
+                        <p className="text-sm font-semibold text-black dark:text-white">{label}</p>
                         {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
                       </div>
                       <Toggle enabled={val} onChange={() => set((v: boolean) => !v)} />
@@ -1205,14 +1208,14 @@ function SettingsModal({ onClose, courses, settings, onSave, userEmail }: {
 
           {activeSection === "display" && (
             <div className="p-6">
-              <p className="font-pixel text-black mb-3" style={{ fontSize: "8px" }}>HIDDEN COURSES</p>
+              <p className="font-pixel text-black dark:text-white mb-3" style={{ fontSize: "8px" }}>HIDDEN COURSES</p>
               {hiddenCourses.length === 0 ? (
                 <p className="text-xs text-gray-400">非表示にしているコースはありません</p>
               ) : (
                 <div className="space-y-1">
                   {hiddenCourses.map((course) => (
                     <div key={course.id} className="flex items-center justify-between py-2.5">
-                      <p className="text-sm text-gray-700 flex-1 pr-4 truncate">{course.name}</p>
+                      <p className="text-sm text-gray-700 dark:text-gray-300 flex-1 pr-4 truncate">{course.name}</p>
                       <button onClick={() => unhideCourse(course.id)}
                         className="text-xs px-3 py-1 rounded-full border-2 border-black bg-[#c8f135] font-semibold hover:opacity-80 transition-opacity">
                         再表示
@@ -1223,11 +1226,36 @@ function SettingsModal({ onClose, courses, settings, onSave, userEmail }: {
               )}
             </div>
           )}
+
+          {activeSection === "theme" && (
+            <div className="p-6">
+              <p className="font-pixel text-black dark:text-white mb-3" style={{ fontSize: "8px" }}>THEME</p>
+              <div className="space-y-2">
+                {([
+                  { value: "light", label: "ライト", desc: "常に明るい表示" },
+                  { value: "dark", label: "ダーク", desc: "常に暗い表示" },
+                  { value: "system", label: "システム", desc: "端末の設定に合わせる" },
+                ] as const).map(({ value, label, desc }) => (
+                  <button
+                    key={value}
+                    onClick={() => onThemeChange(value)}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-colors ${theme === value ? "border-black dark:border-white bg-black dark:bg-white text-[#c8f135] dark:text-black" : "border-gray-200 dark:border-[#444] hover:border-black dark:hover:border-white"}`}
+                  >
+                    <div className="text-left">
+                      <p className={`text-sm font-semibold ${theme === value ? "text-[#c8f135] dark:text-black" : "text-black dark:text-white"}`}>{label}</p>
+                      <p className={`text-xs mt-0.5 ${theme === value ? "text-[#c8f135]/70 dark:text-black/70" : "text-gray-400"}`}>{desc}</p>
+                    </div>
+                    {theme === value && <span className="text-[#c8f135] dark:text-black font-bold">✓</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {activeSection === "notifications" && (
-          <div className="p-6 pt-4 border-t-2 border-black flex gap-3">
-            <button onClick={() => setActiveSection(null)} className="flex-1 border-2 border-black py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-100 transition-colors">
+          <div className="p-6 pt-4 border-t-2 border-black dark:border-[#555] flex gap-3">
+            <button onClick={() => setActiveSection(null)} className="flex-1 border-2 border-black dark:border-[#555] py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-100 dark:hover:bg-[#333] dark:text-white transition-colors">
               キャンセル
             </button>
             <button onClick={save} disabled={saving}
@@ -1263,6 +1291,7 @@ export default function Home() {
   const [showAddRecurringModal, setShowAddRecurringModal] = useState(false);
   const [editingRecurring, setEditingRecurring] = useState<RecurringAssignment | null>(null);
   const [selectedCustomCourseId, setSelectedCustomCourseId] = useState<string | null>(null);
+  const [theme, setTheme] = useState<"light" | "dark" | "system">("system");
 
   useEffect(() => {
     const accessToken = (session as any)?.accessToken;
@@ -1291,6 +1320,27 @@ export default function Home() {
       });
     }
   }, [(session as any)?.accessToken]);
+
+  useEffect(() => {
+    const saved = (localStorage.getItem("theme") as "light" | "dark" | "system") || "system";
+    setTheme(saved);
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "dark") {
+      root.classList.add("dark");
+    } else if (theme === "light") {
+      root.classList.remove("dark");
+    } else {
+      if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        root.classList.add("dark");
+      } else {
+        root.classList.remove("dark");
+      }
+    }
+    localStorage.setItem("theme", theme);
+  }, [theme]);
 
   const toggleCustomSubmit = async (id: string) => {
     const target = customAssignments.find((a) => a.id === id);
@@ -1431,8 +1481,8 @@ export default function Home() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-8">
         <div className="text-center">
-          <p className="font-pixel text-black mb-3" style={{ fontSize: "11px" }}>CLASSROOM</p>
-          <p className="font-pixel text-black" style={{ fontSize: "11px" }}>NOTIFIER</p>
+          <p className="font-pixel text-black dark:text-white mb-3" style={{ fontSize: "11px" }}>CLASSROOM</p>
+          <p className="font-pixel text-black dark:text-white" style={{ fontSize: "11px" }}>NOTIFIER</p>
           <div className="w-32 h-1 bg-[#c8f135] mx-auto mt-4 rounded-full border border-black" />
         </div>
         <button
@@ -1449,7 +1499,7 @@ export default function Home() {
   return (
     <>
       {hideTarget && <HideConfirmDialog courseName={hideTarget.name} onConfirm={confirmHide} onCancel={() => setHideTarget(null)} />}
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} courses={data?.courses ?? []} settings={settings} onSave={saveSettings} userEmail={session?.user?.email ?? ""} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} courses={data?.courses ?? []} settings={settings} onSave={saveSettings} userEmail={session?.user?.email ?? ""} theme={theme} onThemeChange={setTheme} />}
       {showAddModal && (
         <AddCustomAssignmentModal
           onClose={() => setShowAddModal(false)}
@@ -1492,26 +1542,26 @@ export default function Home() {
         )}
 
         {/* ヘッダー */}
-        <div className="bg-white border-2 border-black rounded-2xl shadow-[4px_4px_0px_#1a1a1a] p-4 mb-5 flex items-center justify-between">
-          <p className="font-pixel text-black" style={{ fontSize: "10px" }}>· CLASSROOM NOTIFIER ·</p>
+        <div className="bg-white dark:bg-[#1e1e1e] border-2 border-black dark:border-[#555] rounded-2xl shadow-[4px_4px_0px_#1a1a1a] dark:shadow-[4px_4px_0px_#555] p-4 mb-5 flex items-center justify-between">
+          <p className="font-pixel text-black dark:text-white" style={{ fontSize: "10px" }}>· CLASSROOM NOTIFIER ·</p>
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-400 hidden sm:block">{session.user?.email}</span>
             <button
               onClick={() => setShowSettings(true)}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border-2 border-black bg-white hover:bg-[#c8f135] transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-lg border-2 border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] hover:bg-[#c8f135] transition-colors"
               title="設定"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="black" strokeWidth={2}>
+              <svg className="w-4 h-4 stroke-black dark:stroke-white" fill="none" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </button>
             <button
               onClick={() => signOut()}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border-2 border-black bg-white hover:bg-red-100 transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-lg border-2 border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] hover:bg-red-100 transition-colors"
               title="ログアウト"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="black" strokeWidth={2}>
+              <svg className="w-4 h-4 stroke-black dark:stroke-white" fill="none" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
               </svg>
             </button>
@@ -1524,10 +1574,10 @@ export default function Home() {
             <button
               key={tab}
               onClick={() => { setActiveTab(tab); if (tab === "assignments") setSelectedCourseId(null); setSearchQuery(""); }}
-              className={`flex-1 py-2.5 rounded-xl border-2 border-black font-pixel transition-all ${
+              className={`flex-1 py-2.5 rounded-xl border-2 border-black dark:border-[#555] font-pixel transition-all ${
                 activeTab === tab
                   ? "bg-black text-[#c8f135] shadow-[3px_3px_0px_#555]"
-                  : "bg-white text-black hover:bg-gray-50 shadow-[3px_3px_0px_#1a1a1a]"
+                  : "bg-white dark:bg-[#1e1e1e] text-black dark:text-white hover:bg-gray-50 dark:hover:bg-[#2a2a2a] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555]"
               }`}
               style={{ fontSize: "8px" }}
             >
@@ -1539,7 +1589,7 @@ export default function Home() {
         {/* コンテンツ */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <p className="font-pixel text-gray-400" style={{ fontSize: "9px" }}>LOADING...</p>
+            <p className="font-pixel text-gray-400 dark:text-gray-500" style={{ fontSize: "9px" }}>LOADING...</p>
           </div>
         ) : data ? (
           <>
@@ -1566,11 +1616,11 @@ export default function Home() {
                   />
                 ))}
                 {visibleCourses.length === 0 && customCourses.length === 0 && (
-                  <p className="font-pixel text-gray-400 text-center py-10" style={{ fontSize: "8px" }}>· NO COURSES ·</p>
+                  <p className="font-pixel text-gray-400 dark:text-gray-500 text-center py-10" style={{ fontSize: "8px" }}>· NO COURSES ·</p>
                 )}
                 <button
                   onClick={() => setShowAddCourseModal(true)}
-                  className="w-full mt-2 py-3 rounded-2xl border-dashed border-2 border-black text-sm font-semibold text-gray-400 hover:bg-white hover:text-black transition-colors"
+                  className="w-full mt-2 py-3 rounded-2xl border-dashed border-2 border-black dark:border-[#555] text-sm font-semibold text-gray-400 hover:bg-white dark:hover:bg-[#1e1e1e] hover:text-black dark:hover:text-white transition-colors"
                 >
                   + 授業を追加
                 </button>
@@ -1582,8 +1632,8 @@ export default function Home() {
                 {selectedCustomCourse ? (
                   <>
                     <div className="flex items-center gap-2 mb-3">
-                      <div className="flex items-center gap-2 flex-1 bg-white border-dashed border-2 border-black rounded-xl px-4 py-2.5 shadow-[3px_3px_0px_#1a1a1a]">
-                        <span className="text-sm font-semibold text-black truncate flex-1">{selectedCustomCourse.name}</span>
+                      <div className="flex items-center gap-2 flex-1 bg-white dark:bg-[#1e1e1e] border-dashed border-2 border-black dark:border-[#555] rounded-xl px-4 py-2.5 shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555]">
+                        <span className="text-sm font-semibold text-black dark:text-white truncate flex-1">{selectedCustomCourse.name}</span>
                         <button onClick={() => { setSelectedCustomCourseId(null); setActiveTab("courses"); }}
                           className="text-xs font-pixel text-gray-400 hover:text-black flex-shrink-0 transition-colors"
                           style={{ fontSize: "7px" }}>
@@ -1592,7 +1642,7 @@ export default function Home() {
                       </div>
                       <button
                         onClick={() => setShowAddModal(true)}
-                        className="w-10 h-10 flex items-center justify-center rounded-xl border-2 border-black bg-black text-[#c8f135] shadow-[3px_3px_0px_#1a1a1a] hover:shadow-[1px_1px_0px_#1a1a1a] hover:translate-x-0.5 hover:translate-y-0.5 transition-all font-bold text-lg flex-shrink-0"
+                        className="w-10 h-10 flex items-center justify-center rounded-xl border-2 border-black dark:border-[#555] bg-black text-[#c8f135] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] hover:shadow-[1px_1px_0px_#1a1a1a] hover:translate-x-0.5 hover:translate-y-0.5 transition-all font-bold text-lg flex-shrink-0"
                       >
                         +
                       </button>
@@ -1618,7 +1668,7 @@ export default function Home() {
                           )}
                           <button
                             onClick={() => setShowAddRecurringModal(true)}
-                            className="w-full py-2 rounded-xl border-dashed border-2 border-black text-xs font-semibold text-gray-400 hover:bg-white hover:text-black transition-colors flex items-center justify-center gap-1.5"
+                            className="w-full py-2 rounded-xl border-dashed border-2 border-black dark:border-[#555] text-xs font-semibold text-gray-400 hover:bg-white dark:hover:bg-[#1e1e1e] hover:text-black dark:hover:text-white transition-colors flex items-center justify-center gap-1.5"
                           >
                             <span>🔄</span> 繰り返し課題を設定
                           </button>
@@ -1642,8 +1692,8 @@ export default function Home() {
                   <>
                     <div className="flex flex-col gap-2 mb-4">
                       {selectedCourse && (
-                        <div className="flex items-center gap-2 bg-white border-2 border-black rounded-xl px-4 py-2.5 shadow-[3px_3px_0px_#1a1a1a]">
-                          <span className="text-sm font-semibold text-black truncate flex-1">{selectedCourse.name}</span>
+                        <div className="flex items-center gap-2 bg-white dark:bg-[#1e1e1e] border-2 border-black dark:border-[#555] rounded-xl px-4 py-2.5 shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555]">
+                          <span className="text-sm font-semibold text-black dark:text-white truncate flex-1">{selectedCourse.name}</span>
                           <button onClick={() => setSelectedCourseId(null)}
                             className="text-xs font-pixel text-gray-400 hover:text-black flex-shrink-0 transition-colors"
                             style={{ fontSize: "7px" }}>
@@ -1657,7 +1707,7 @@ export default function Home() {
                           placeholder="課題・コース名で検索..."
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
-                          className="w-full bg-white border-2 border-black rounded-xl px-4 py-2.5 text-sm focus:outline-none shadow-[3px_3px_0px_#1a1a1a] pr-8"
+                          className="w-full bg-white dark:bg-[#1e1e1e] border-2 border-black dark:border-[#555] rounded-xl px-4 py-2.5 text-sm focus:outline-none shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] pr-8 dark:text-white"
                         />
                         {searchQuery && (
                           <button onClick={() => setSearchQuery("")}
