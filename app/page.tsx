@@ -67,6 +67,7 @@ type UserSettings = {
   per_course_notify: boolean;
   notify_announcements: boolean;
   notify_materials: boolean;
+  discord_user_id?: string | null;
 };
 
 // ---- 期限バッジ ----
@@ -1120,6 +1121,22 @@ function SettingsModal({ onClose, courses, settings, onSave }: {
             </div>
           </div>
 
+          <div>
+            <p className="font-pixel text-black mb-3" style={{ fontSize: "8px" }}>DISCORD</p>
+            <div className="flex items-center justify-between py-2 border-b border-gray-100">
+              <div>
+                <p className="text-sm font-semibold text-black">Discord DM通知</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {settings.discord_user_id ? "連携済み ✓" : "未連携"}
+                </p>
+              </div>
+              <a href="/api/discord/connect"
+                className="text-xs px-3 py-1.5 rounded-full border-2 border-black bg-[#5865F2] text-white font-semibold hover:opacity-80 transition-opacity">
+                {settings.discord_user_id ? "再連携" : "連携する"}
+              </a>
+            </div>
+          </div>
+
           {hiddenCourses.length > 0 && (
             <div>
               <p className="font-pixel text-black mb-3" style={{ fontSize: "8px" }}>HIDDEN COURSES</p>
@@ -1192,6 +1209,7 @@ export default function Home() {
           per_course_notify: settingsData.per_course_notify ?? false,
           notify_announcements: settingsData.notify_announcements ?? true,
           notify_materials: settingsData.notify_materials ?? true,
+          discord_user_id: settingsData.discord_user_id ?? null,
         });
         if (Array.isArray(customData)) setCustomAssignments(customData);
         if (Array.isArray(coursesData)) setCustomCourses(coursesData);

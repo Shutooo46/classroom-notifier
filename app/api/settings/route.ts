@@ -14,7 +14,7 @@ export async function GET() {
 
   const { data } = await supabase
     .from("user_settings")
-    .select("reminder_minutes, course_settings, per_course_notify, notify_announcements, notify_materials")
+    .select("reminder_minutes, course_settings, per_course_notify, notify_announcements, notify_materials, discord_user_id")
     .eq("user_id", userId)
     .single();
 
@@ -24,6 +24,7 @@ export async function GET() {
     per_course_notify: data?.per_course_notify ?? false,
     notify_announcements: data?.notify_announcements ?? true,
     notify_materials: data?.notify_materials ?? true,
+    discord_user_id: data?.discord_user_id ?? null,
   });
 }
 
