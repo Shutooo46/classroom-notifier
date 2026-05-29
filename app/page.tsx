@@ -1382,9 +1382,7 @@ export default function Home() {
                     {(["noDue", "thisWeek", "nextWeek", "later"] as const).map((section, i) => {
                       const labels = ["期限なし", "今週", "次の週", "それ以降"];
                       const classroomItems = filterByCourse(data[section]);
-                      const customItems = selectedCourseId ? [] : getCustomForSection(section).filter((a) =>
-                        !customCourses.some((c) => c.name === a.course_name)
-                      );
+                      const customItems = selectedCourseId ? [] : getCustomForSection(section);
                       return (
                         <Section key={section} title={labels[i]}
                           assignments={classroomItems}
