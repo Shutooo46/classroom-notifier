@@ -37,5 +37,31 @@ export async function GET(request: Request) {
     { onConflict: "user_id" }
   );
 
+  const dmRes = await fetch("https://discord.com/api/v10/users/@me/channels", {
+    method: "POST",
+    headers: {
+      Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ recipient_id: discordUser.id }),
+  });
+  const dm = await dmRes.json();
+  if (dm.id) {
+    await fetch(`https://discord.com/api/v10/channels/${dm.id}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        embeds: [{
+          title: "✅ Discord連携が完了しました！",
+          description: "これからGoogle Classroomの課題・お知らせをここに通知します。",
+          color: 0x4285f4,
+        }],
+      }),
+    });
+  }
+
   return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/?discord=connected`);
 }
