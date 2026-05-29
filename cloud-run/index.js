@@ -8,8 +8,8 @@ const CLOUD_RUN_SECRET = process.env.CLOUD_RUN_SECRET;
 
 app.use((req, res, next) => {
   if (req.method !== "POST") return next();
-  const auth = req.headers.authorization;
-  if (!CLOUD_RUN_SECRET || auth !== `Bearer ${CLOUD_RUN_SECRET}`) {
+  const secret = req.headers["x-internal-secret"];
+  if (!CLOUD_RUN_SECRET || secret !== CLOUD_RUN_SECRET) {
     return res.status(401).json({ error: "Unauthorized" });
   }
   next();
