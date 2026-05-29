@@ -4,6 +4,12 @@ import { authOptions } from "../../auth/[...nextauth]/route";
 import { supabase } from "@/lib/supabase";
 import { cookies } from "next/headers";
 
+function redirectWithClearedState(url: string) {
+  const res = NextResponse.redirect(url);
+  res.cookies.delete("discord_oauth_state");
+  return res;
+}
+
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/?error=auth`);
@@ -31,13 +37,13 @@ export async function GET(request: Request) {
     }),
   });
   const tokenData = await tokenRes.json();
-  if (!tokenData.access_token) return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/?error=discord`);
+  if (!tokenData.access_token) return redirectWithClearedState(`${process.env.NEXTAUTH_URL}/?error=discord`);
 
   const userRes = await fetch("https://discord.com/api/users/@me", {
     headers: { Authorization: `Bearer ${tokenData.access_token}` },
   });
   const discordUser = await userRes.json();
-  if (!discordUser.id) return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/?error=discord`);
+  if (!discordUser.id) return redirectWithClearedState(`${process.env.NEXTAUTH_URL}/?error=discord`);
 
   const userId = (session as any).userId;
   await supabase.from("user_settings").upsert(
@@ -71,7 +77,5 @@ export async function GET(request: Request) {
     });
   }
 
-  const redirectResponse = NextResponse.redirect(`${process.env.NEXTAUTH_URL}/?discord=connected`);
-  redirectResponse.cookies.delete("discord_oauth_state");
-  return redirectResponse;
+  return redirectWithClearedState(`${process.env.NEXTAUTH_URL}/?discord=connected`);
 }
