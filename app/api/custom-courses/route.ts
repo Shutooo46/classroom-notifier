@@ -42,10 +42,13 @@ export async function DELETE(request: Request) {
 
   const userId = (session as any).userId;
   const { id } = await request.json();
+  if (!id) return NextResponse.json({ error: "idは必須です" }, { status: 400 });
 
-  const courseName = (await supabase.from("custom_courses").select("name").eq("id", id).single()).data?.name ?? "";
-  await supabase.from("custom_assignments").delete().eq("user_id", userId).eq("course_name", courseName);
-  await supabase.from("recurring_assignments").delete().eq("user_id", userId).eq("course_name", courseName);
+  const { data: course } = await supabase.from("custom_courses").select("name").eq("id", id).eq("user_id", userId).single();
+  if (!course) return NextResponse.json({ error: "Course not found" }, { status: 404 });
+
+  await supabase.from("custom_assignments").delete().eq("user_id", userId).eq("course_name", course.name);
+  await supabase.from("recurring_assignments").delete().eq("user_id", userId).eq("course_name", course.name);
   await supabase.from("custom_courses").delete().eq("id", id).eq("user_id", userId);
 
   return NextResponse.json({ success: true });
