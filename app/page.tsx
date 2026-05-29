@@ -1393,6 +1393,19 @@ export default function Home() {
       )}
 
       <div className="max-w-2xl mx-auto p-6">
+        {!loading && !settings.discord_user_id && (
+          <div className="bg-[#5865F2] border-2 border-black rounded-2xl shadow-[4px_4px_0px_#1a1a1a] p-4 mb-5 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-white font-semibold text-sm">Discord を連携してください</p>
+              <p className="text-indigo-200 text-xs mt-0.5">連携しないと課題・お知らせの通知が届きません</p>
+            </div>
+            <a href="/api/discord/connect"
+              className="shrink-0 px-4 py-2 rounded-xl border-2 border-white text-white font-semibold text-sm hover:bg-white hover:text-[#5865F2] transition-colors">
+              連携する
+            </a>
+          </div>
+        )}
+
         {/* ヘッダー */}
         <div className="bg-white border-2 border-black rounded-2xl shadow-[4px_4px_0px_#1a1a1a] p-4 mb-5 flex items-center justify-between">
           <p className="font-pixel text-black" style={{ fontSize: "10px" }}>· CLASSROOM NOTIFIER ·</p>
