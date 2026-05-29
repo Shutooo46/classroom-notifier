@@ -251,10 +251,10 @@ function CustomAssignmentCard({ assignment, onToggle, onDelete }: {
   const cardBase = "rounded-2xl p-4 mb-2 flex items-start justify-between transition-all border-dashed border-2";
   const cardStyle: Record<string, string> = {
     done: `${cardBase} border-black dark:border-[#555] bg-gray-100 dark:bg-[#2a2a2a] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] opacity-60`,
-    high: `${cardBase} border-black dark:border-[#555] bg-white dark:bg-[#1e1e1e] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#ff6b6b]`,
-    mid:  `${cardBase} border-black dark:border-[#555] bg-white dark:bg-[#1e1e1e] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#c8f135]`,
-    low:  `${cardBase} border-black dark:border-[#555] bg-white dark:bg-[#1e1e1e] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#7dd3fc]`,
-    none: `${cardBase} border-black dark:border-[#555] bg-white dark:bg-[#1e1e1e] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555]`,
+    high: `${cardBase} border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#ff6b6b] dark:border-l-[#ff6b6b]`,
+    mid:  `${cardBase} border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#c8f135] dark:border-l-[#c8f135]`,
+    low:  `${cardBase} border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#7dd3fc] dark:border-l-[#7dd3fc]`,
+    none: `${cardBase} border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555]`,
   };
 
   const dueLabel = assignment.due_date
@@ -782,10 +782,10 @@ function AssignmentCard({ assignment, userEmail }: { assignment: Assignment; use
 
   const cardStyle: Record<string, string> = {
     done: "bg-gray-100 dark:bg-[#2a2a2a] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] opacity-60",
-    high: "bg-white dark:bg-[#1e1e1e] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#ff6b6b]",
-    mid: "bg-white dark:bg-[#1e1e1e] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#c8f135]",
-    low: "bg-white dark:bg-[#1e1e1e] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#7dd3fc]",
-    none: "bg-white dark:bg-[#1e1e1e] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555]",
+    high: "bg-white dark:bg-[#2a2a2a] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#ff6b6b] dark:border-l-[#ff6b6b]",
+    mid: "bg-white dark:bg-[#2a2a2a] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#c8f135] dark:border-l-[#c8f135]",
+    low: "bg-white dark:bg-[#2a2a2a] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#7dd3fc] dark:border-l-[#7dd3fc]",
+    none: "bg-white dark:bg-[#2a2a2a] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555]",
   };
 
   const titleStyle: Record<string, string> = {
@@ -1052,8 +1052,8 @@ function SettingsModal({ onClose, courses, settings, onSave, userEmail, theme, o
   onClose: () => void; courses: Course[]; settings: UserSettings;
   onSave: (patch: Partial<UserSettings>) => Promise<void>;
   userEmail: string;
-  theme: "light" | "dark" | "system";
-  onThemeChange: (t: "light" | "dark" | "system") => void;
+  theme: "light" | "dark";
+  onThemeChange: (t: "light" | "dark") => void;
 }) {
   const [activeSection, setActiveSection] = useState<null | "account" | "notifications" | "display" | "theme">(null);
   const [hours, setHours] = useState(Math.floor(settings.reminder_minutes / 60));
@@ -1115,7 +1115,7 @@ function SettingsModal({ onClose, courses, settings, onSave, userEmail, theme, o
                 { key: "account", label: "アカウント", sub: userEmail },
                 { key: "notifications", label: "通知", sub: "リマインド・通知設定" },
                 { key: "display", label: "表示", sub: "非表示コース" },
-                { key: "theme", label: "テーマ", sub: "ライト / ダーク / システム" },
+                { key: "theme", label: "テーマ", sub: "ライト / ダーク" },
               ].map(({ key, label, sub }) => (
                 <button
                   key={key}
@@ -1234,7 +1234,6 @@ function SettingsModal({ onClose, courses, settings, onSave, userEmail, theme, o
                 {([
                   { value: "light", label: "ライト", desc: "常に明るい表示" },
                   { value: "dark", label: "ダーク", desc: "常に暗い表示" },
-                  { value: "system", label: "システム", desc: "端末の設定に合わせる" },
                 ] as const).map(({ value, label, desc }) => (
                   <button
                     key={value}
@@ -1291,7 +1290,7 @@ export default function Home() {
   const [showAddRecurringModal, setShowAddRecurringModal] = useState(false);
   const [editingRecurring, setEditingRecurring] = useState<RecurringAssignment | null>(null);
   const [selectedCustomCourseId, setSelectedCustomCourseId] = useState<string | null>(null);
-  const [theme, setTheme] = useState<"light" | "dark" | "system">("system");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
     const accessToken = (session as any)?.accessToken;
@@ -1322,22 +1321,16 @@ export default function Home() {
   }, [(session as any)?.accessToken]);
 
   useEffect(() => {
-    const saved = (localStorage.getItem("theme") as "light" | "dark" | "system") || "system";
-    setTheme(saved);
+    const saved = localStorage.getItem("theme");
+    if (saved === "dark") setTheme("dark");
   }, []);
 
   useEffect(() => {
     const root = document.documentElement;
     if (theme === "dark") {
       root.classList.add("dark");
-    } else if (theme === "light") {
-      root.classList.remove("dark");
     } else {
-      if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-        root.classList.add("dark");
-      } else {
-        root.classList.remove("dark");
-      }
+      root.classList.remove("dark");
     }
     localStorage.setItem("theme", theme);
   }, [theme]);
@@ -1574,10 +1567,10 @@ export default function Home() {
             <button
               key={tab}
               onClick={() => { setActiveTab(tab); if (tab === "assignments") setSelectedCourseId(null); setSearchQuery(""); }}
-              className={`flex-1 py-2.5 rounded-xl border-2 border-black dark:border-[#555] font-pixel transition-all ${
+              className={`flex-1 py-2.5 rounded-xl border-2 font-pixel transition-all ${
                 activeTab === tab
-                  ? "bg-black text-[#c8f135] shadow-[3px_3px_0px_#555]"
-                  : "bg-white dark:bg-[#1e1e1e] text-black dark:text-white hover:bg-gray-50 dark:hover:bg-[#2a2a2a] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555]"
+                  ? "border-black dark:border-[#c8f135] bg-black dark:bg-[#c8f135] text-[#c8f135] dark:text-black shadow-[3px_3px_0px_#555]"
+                  : "border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] text-black dark:text-[#aaa] hover:bg-gray-50 dark:hover:bg-[#333] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555]"
               }`}
               style={{ fontSize: "8px" }}
             >
