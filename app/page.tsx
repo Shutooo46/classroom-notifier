@@ -1053,7 +1053,7 @@ function SettingsModal({ onClose, courses, settings, onSave, userEmail }: {
   onSave: (patch: Partial<UserSettings>) => Promise<void>;
   userEmail: string;
 }) {
-  const [activeSection, setActiveSection] = useState<"account" | "notifications" | "display">("account");
+  const [activeSection, setActiveSection] = useState<null | "account" | "notifications" | "display">(null);
   const [hours, setHours] = useState(Math.floor(settings.reminder_minutes / 60));
   const [mins, setMins] = useState(settings.reminder_minutes % 60);
   const [perCourseNotify, setPerCourseNotify] = useState(settings.per_course_notify);
@@ -1062,10 +1062,15 @@ function SettingsModal({ onClose, courses, settings, onSave, userEmail }: {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (activeSection) setActiveSection(null);
+        else onClose();
+      }
+    };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
+  }, [onClose, activeSection]);
 
   const hiddenCourses = courses.filter((c) => settings.course_settings[c.id]?.hidden === true);
 
@@ -1078,52 +1083,63 @@ function SettingsModal({ onClose, courses, settings, onSave, userEmail }: {
     setSaving(true);
     await onSave({ reminder_minutes: hours * 60 + mins, per_course_notify: perCourseNotify, notify_announcements: notifyAnnouncements, notify_materials: notifyMaterials });
     setSaving(false);
-    onClose();
+    setActiveSection(null);
   };
 
   const hourValues = Array.from({ length: 24 }, (_, i) => String(i));
   const minValues = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
 
-  const sections = [
-    { key: "account", label: "アカウント" },
-    { key: "notifications", label: "通知" },
-    { key: "display", label: "表示" },
-  ] as const;
+  const sectionTitle: Record<string, string> = { account: "アカウント", notifications: "通知", display: "表示" };
 
   return (
     <div style={{ backgroundColor: "rgba(0,0,0,0.5)" }} className="fixed inset-0 flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl w-96 border-2 border-black shadow-[6px_6px_0px_#1a1a1a] max-h-[85vh] flex flex-col">
         <div className="flex items-center justify-between p-6 pb-4 border-b-2 border-black">
-          <p className="font-pixel text-black" style={{ fontSize: "10px" }}>SETTINGS</p>
+          {activeSection ? (
+            <button onClick={() => setActiveSection(null)} className="flex items-center gap-1.5 text-sm font-semibold hover:opacity-70 transition-opacity">
+              <span className="text-base">‹</span>
+              <span className="font-pixel" style={{ fontSize: "10px" }}>{sectionTitle[activeSection]}</span>
+            </button>
+          ) : (
+            <p className="font-pixel text-black" style={{ fontSize: "10px" }}>SETTINGS</p>
+          )}
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg border-2 border-black hover:bg-gray-100 font-bold text-sm">✕</button>
         </div>
 
-        {/* セクションタブ */}
-        <div className="flex border-b-2 border-black">
-          {sections.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setActiveSection(key)}
-              className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${activeSection === key ? "bg-black text-[#c8f135]" : "text-gray-400 hover:text-black hover:bg-gray-50"}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <div className="overflow-y-auto flex-1">
+          {!activeSection && (
+            <div className="divide-y-2 divide-black">
+              {[
+                { key: "account", label: "アカウント", sub: userEmail },
+                { key: "notifications", label: "通知", sub: "リマインド・通知設定" },
+                { key: "display", label: "表示", sub: "非表示コース" },
+              ].map(({ key, label, sub }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveSection(key as "account" | "notifications" | "display")}
+                  className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors text-left"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-black">{label}</p>
+                    <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[260px]">{sub}</p>
+                  </div>
+                  <span className="text-gray-300 text-lg">›</span>
+                </button>
+              ))}
+            </div>
+          )}
 
-        <div className="overflow-y-auto flex-1 p-6 space-y-6">
           {activeSection === "account" && (
-            <>
+            <div className="p-6 space-y-6">
               <div>
                 <p className="font-pixel text-black mb-3" style={{ fontSize: "8px" }}>GOOGLE</p>
                 <div className="flex items-center justify-between py-2 border-b border-gray-100">
                   <div>
                     <p className="text-sm font-semibold text-black">Googleアカウント</p>
-                    <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[200px]">{userEmail}</p>
+                    <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[240px]">{userEmail}</p>
                   </div>
                 </div>
               </div>
-
               <div>
                 <p className="font-pixel text-black mb-3" style={{ fontSize: "8px" }}>DISCORD</p>
                 <div className="flex items-center justify-between py-2 border-b border-gray-100">
@@ -1151,11 +1167,11 @@ function SettingsModal({ onClose, courses, settings, onSave, userEmail }: {
                   </div>
                 </div>
               </div>
-            </>
+            </div>
           )}
 
           {activeSection === "notifications" && (
-            <>
+            <div className="p-6 space-y-6">
               <div>
                 <p className="font-pixel text-black mb-1" style={{ fontSize: "8px" }}>REMINDER TIMING</p>
                 <p className="text-xs text-gray-400 mb-4">期限の何時間・何分前に通知するか</p>
@@ -1166,7 +1182,6 @@ function SettingsModal({ onClose, courses, settings, onSave, userEmail }: {
                 </div>
                 <p className="text-xs text-gray-400 mt-2">※新しく追加された課題から適用されます</p>
               </div>
-
               <div>
                 <p className="font-pixel text-black mb-3" style={{ fontSize: "8px" }}>NOTIFICATIONS</p>
                 <div className="space-y-3">
@@ -1185,11 +1200,11 @@ function SettingsModal({ onClose, courses, settings, onSave, userEmail }: {
                   ))}
                 </div>
               </div>
-            </>
+            </div>
           )}
 
           {activeSection === "display" && (
-            <div>
+            <div className="p-6">
               <p className="font-pixel text-black mb-3" style={{ fontSize: "8px" }}>HIDDEN COURSES</p>
               {hiddenCourses.length === 0 ? (
                 <p className="text-xs text-gray-400">非表示にしているコースはありません</p>
@@ -1210,17 +1225,17 @@ function SettingsModal({ onClose, courses, settings, onSave, userEmail }: {
           )}
         </div>
 
-        <div className="p-6 pt-4 border-t-2 border-black flex gap-3">
-          <button onClick={onClose} className="flex-1 border-2 border-black py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-100 transition-colors">
-            キャンセル
-          </button>
-          {activeSection === "notifications" && (
+        {activeSection === "notifications" && (
+          <div className="p-6 pt-4 border-t-2 border-black flex gap-3">
+            <button onClick={() => setActiveSection(null)} className="flex-1 border-2 border-black py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-100 transition-colors">
+              キャンセル
+            </button>
             <button onClick={save} disabled={saving}
               className="flex-1 border-2 border-black py-2.5 rounded-xl text-sm font-semibold bg-black text-[#c8f135] hover:opacity-90 disabled:opacity-50 transition-opacity">
               {saving ? "SAVING..." : "SAVE"}
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
