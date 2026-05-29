@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import { supabase } from "@/lib/supabase";
+import { cookies } from "next/headers";
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
@@ -9,7 +10,14 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
+  const state = searchParams.get("state");
   if (!code) return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/?error=discord`);
+
+  const cookieStore = await cookies();
+  const savedState = cookieStore.get("discord_oauth_state")?.value;
+  if (!state || !savedState || state !== savedState) {
+    return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/?error=discord`);
+  }
 
   const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
     method: "POST",
@@ -63,5 +71,7 @@ export async function GET(request: Request) {
     });
   }
 
-  return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/?discord=connected`);
+  const redirectResponse = NextResponse.redirect(`${process.env.NEXTAUTH_URL}/?discord=connected`);
+  redirectResponse.cookies.delete("discord_oauth_state");
+  return redirectResponse;
 }

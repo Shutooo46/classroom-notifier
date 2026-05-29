@@ -10,7 +10,6 @@ export async function GET() {
   }
 
   const userId = (session as any).userId;
-  console.log("userId:", userId);
 
   const { data } = await supabase
     .from("user_settings")
