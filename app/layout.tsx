@@ -26,7 +26,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja" className={`${pressStart.variable} ${dmSans.variable}`}>
-      <script dangerouslySetInnerHTML={{ __html: `(function(){if(localStorage.getItem('theme')==='dark')document.documentElement.classList.add('dark');})()` }} />
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `(function(){if(localStorage.getItem('theme')==='dark')document.documentElement.classList.add('dark');})()` }} />
+      </head>
       <body>
         <Providers>{children}</Providers>
       </body>
