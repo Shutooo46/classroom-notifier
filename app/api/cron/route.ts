@@ -1,6 +1,33 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
+export const maxDuration = 300;
+
+async function callCloudRun(path: string, body: Record<string, unknown>): Promise<void> {
+  const res = await fetch(`${process.env.CLOUD_RUN_URL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-internal-secret": process.env.CLOUD_RUN_SECRET! },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    console.error(`Cloud Run ${path} error ${res.status}:`, text);
+  }
+}
+
+async function tryInsertNotification(
+  assignmentId: string,
+  userId: string,
+  notificationType: string
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("notified_assignments")
+    .insert({ assignment_id: assignmentId, user_id: userId, notified_at: new Date().toISOString(), notification_type: notificationType })
+    .select("id")
+    .single();
+  return data !== null;
+}
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -101,14 +128,8 @@ export async function GET(request: Request) {
 
         if (submitted) continue;
 
-        const { data: insertedNew } = await supabase
-          .from("notified_assignments")
-          .upsert({ assignment_id: assignment.id, user_id: user.user_id, notified_at: new Date().toISOString(), notification_type: "new" }, { onConflict: "assignment_id,user_id,notification_type", ignoreDuplicates: true })
-          .select("id")
-          .single();
-
-        if (insertedNew) {
-
+        const isNew = await tryInsertNotification(assignment.id, user.user_id, "new");
+        if (isNew) {
           const driveFileIds: string[] = [];
           if (assignment.materials) {
             for (const material of assignment.materials) {
@@ -117,7 +138,7 @@ export async function GET(request: Request) {
               }
             }
           }
-
+          // Gemini summarization is slow — fire and forget
           fetch(`${process.env.CLOUD_RUN_URL}/process`, {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-internal-secret": process.env.CLOUD_RUN_SECRET! },
@@ -130,10 +151,9 @@ export async function GET(request: Request) {
               driveFileIds,
               discord_user_id: discordUserId,
             }),
-          }).catch((e) => console.error("Cloud Run error:", e));
+          }).catch((e) => console.error("Cloud Run /process error:", e));
         }
 
-        // 24時間前通知 & リマインド通知（cronが毎回チェック）
         if (assignment.dueDate) {
           const dueWithTime = new Date(Date.UTC(
             assignment.dueDate.year,
@@ -146,52 +166,33 @@ export async function GET(request: Request) {
           const diffMinutes = (dueWithTime.getTime() - now.getTime()) / 60000;
 
           if (diffMinutes > 0 && diffMinutes <= 24 * 60) {
-            const { data: inserted24h } = await supabase
-              .from("notified_assignments")
-              .upsert({ assignment_id: assignment.id, user_id: user.user_id, notified_at: new Date().toISOString(), notification_type: "24h" }, { onConflict: "assignment_id,user_id,notification_type", ignoreDuplicates: true })
-              .select("id")
-              .single();
-
-            if (inserted24h) {
-              fetch(`${process.env.CLOUD_RUN_URL}/process-classroom-reminder`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "x-internal-secret": process.env.CLOUD_RUN_SECRET! },
-                body: JSON.stringify({
-                  assignment_title: assignment.title,
-                  course_name: course.name,
-                  due: dueWithTime.toISOString(),
-                  notification_type: "24h",
-                  discord_user_id: discordUserId,
-                }),
-              }).catch((e) => console.error("Cloud Run 24h error:", e));
+            const is24h = await tryInsertNotification(assignment.id, user.user_id, "24h");
+            if (is24h) {
+              await callCloudRun("/process-classroom-reminder", {
+                assignment_title: assignment.title,
+                course_name: course.name,
+                due: dueWithTime.toISOString(),
+                notification_type: "24h",
+                discord_user_id: discordUserId,
+              });
             }
           }
 
           if (diffMinutes > 0 && diffMinutes <= reminderMinutes && reminderMinutes < 22 * 60) {
-            const { data: insertedReminder } = await supabase
-              .from("notified_assignments")
-              .upsert({ assignment_id: assignment.id, user_id: user.user_id, notified_at: new Date().toISOString(), notification_type: "reminder" }, { onConflict: "assignment_id,user_id,notification_type", ignoreDuplicates: true })
-              .select("id")
-              .single();
-
-            if (insertedReminder) {
-              fetch(`${process.env.CLOUD_RUN_URL}/process-classroom-reminder`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "x-internal-secret": process.env.CLOUD_RUN_SECRET! },
-                body: JSON.stringify({
-                  assignment_title: assignment.title,
-                  course_name: course.name,
-                  due: dueWithTime.toISOString(),
-                  notification_type: "reminder",
-                  discord_user_id: discordUserId,
-                }),
-              }).catch((e) => console.error("Cloud Run reminder error:", e));
+            const isReminder = await tryInsertNotification(assignment.id, user.user_id, "reminder");
+            if (isReminder) {
+              await callCloudRun("/process-classroom-reminder", {
+                assignment_title: assignment.title,
+                course_name: course.name,
+                due: dueWithTime.toISOString(),
+                notification_type: "reminder",
+                discord_user_id: discordUserId,
+              });
             }
           }
         }
       }
 
-      // お知らせ通知
       if (notifyAnnouncements) {
         const annRes = await fetch(
           `https://classroom.googleapis.com/v1/courses/${course.id}/announcements?orderBy=updateTime%20desc`,
@@ -206,24 +207,18 @@ export async function GET(request: Request) {
           twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
           if (createdAt < twoWeeksAgo) continue;
 
-          const { data: insertedAnn } = await supabase
-            .from("notified_assignments")
-            .upsert({ assignment_id: announcement.id, user_id: user.user_id, notified_at: new Date().toISOString(), notification_type: "announcement" }, { onConflict: "assignment_id,user_id,notification_type", ignoreDuplicates: true })
-            .select("id")
-            .single();
-
-          if (insertedAnn) {
-
-            fetch(`${process.env.CLOUD_RUN_URL}/process-announcement`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "x-internal-secret": process.env.CLOUD_RUN_SECRET! },
-              body: JSON.stringify({ announcement, course, user_id: user.user_id, discord_user_id: discordUserId }),
-            }).catch((e) => console.error("Cloud Run announcement error:", e));
+          const isAnn = await tryInsertNotification(announcement.id, user.user_id, "announcement");
+          if (isAnn) {
+            await callCloudRun("/process-announcement", {
+              announcement,
+              course,
+              user_id: user.user_id,
+              discord_user_id: discordUserId,
+            });
           }
         }
       }
 
-      // 資料投稿通知
       if (notifyMaterials) {
         const matRes = await fetch(
           `https://classroom.googleapis.com/v1/courses/${course.id}/courseWorkMaterials?orderBy=updateTime%20desc`,
@@ -238,26 +233,20 @@ export async function GET(request: Request) {
           twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
           if (createdAt < twoWeeksAgo) continue;
 
-          const { data: insertedMat } = await supabase
-            .from("notified_assignments")
-            .upsert({ assignment_id: material.id, user_id: user.user_id, notified_at: new Date().toISOString(), notification_type: "material" }, { onConflict: "assignment_id,user_id,notification_type", ignoreDuplicates: true })
-            .select("id")
-            .single();
-
-          if (insertedMat) {
-
+          const isMat = await tryInsertNotification(material.id, user.user_id, "material");
+          if (isMat) {
             const driveFileIds: string[] = [];
             if (material.materials) {
               for (const m of material.materials) {
                 if (m.driveFile?.driveFile?.id) driveFileIds.push(m.driveFile.driveFile.id);
               }
             }
-
+            // Gemini summarization is slow — fire and forget
             fetch(`${process.env.CLOUD_RUN_URL}/process-material`, {
               method: "POST",
               headers: { "Content-Type": "application/json", "x-internal-secret": process.env.CLOUD_RUN_SECRET! },
               body: JSON.stringify({ material, course, user_id: user.user_id, accessToken, driveFileIds, discord_user_id: discordUserId }),
-            }).catch((e) => console.error("Cloud Run material error:", e));
+            }).catch((e) => console.error("Cloud Run /process-material error:", e));
           }
         }
       }
@@ -271,15 +260,12 @@ export async function GET(request: Request) {
       .eq("active", true);
 
     if (recurringTemplates && recurringTemplates.length > 0) {
-      // JST の今日の曜日・日付を取得
       const nowJST = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
       const todayDayOfWeek = nowJST.getUTCDay();
 
       for (const template of recurringTemplates) {
-        // 出題曜日が今日でなければスキップ（intervalWeeks=2 の場合は週の判定が必要）
         if (todayDayOfWeek !== template.day_of_week) continue;
 
-        // 2週ごとの場合、今週が出題週かチェック（epoch からの週数で判定）
         if (template.interval_weeks === 2) {
           const epochWeek = Math.floor(nowJST.getTime() / (7 * 24 * 60 * 60 * 1000));
           const createdWeek = Math.floor(new Date(template.created_at).getTime() / (7 * 24 * 60 * 60 * 1000));
@@ -317,24 +303,13 @@ export async function GET(request: Request) {
 
         if (!assignmentId) continue;
 
-        // 新着通知（まだ送っていなければ）
-        const { data: insertedCustomNew } = await supabase
-          .from("notified_assignments")
-          .upsert({ assignment_id: assignmentId, user_id: user.user_id, notified_at: new Date().toISOString(), notification_type: "custom_new" }, { onConflict: "assignment_id,user_id,notification_type", ignoreDuplicates: true })
-          .select("id")
-          .single();
-
-        if (insertedCustomNew) {
-
-          fetch(`${process.env.CLOUD_RUN_URL}/process-custom-reminder`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "x-internal-secret": process.env.CLOUD_RUN_SECRET! },
-            body: JSON.stringify({
-              assignment: { id: assignmentId, title: template.title, course_name: template.course_name, due_date: dueDateStr, due_time: template.due_time ?? "23:59" },
-              reminderType: "new",
-              discord_user_id: discordUserId,
-            }),
-          }).catch((e) => console.error("Cloud Run recurring new error:", e));
+        const isCustomNew = await tryInsertNotification(assignmentId, user.user_id, "custom_new");
+        if (isCustomNew) {
+          await callCloudRun("/process-custom-reminder", {
+            assignment: { id: assignmentId, title: template.title, course_name: template.course_name, due_date: dueDateStr, due_time: template.due_time ?? "23:59" },
+            reminderType: "new",
+            discord_user_id: discordUserId,
+          });
         }
       }
     }
@@ -350,43 +325,31 @@ export async function GET(request: Request) {
     if (customAssignments && customAssignments.length > 0) {
       const now = new Date();
       for (const assignment of customAssignments) {
-        // due_date を JST 23:59 として扱う (UTC 14:59)
         const dueTimeStr = (assignment.due_time as string | null) ?? "23:59";
         const dueDate = new Date(`${assignment.due_date}T${dueTimeStr}:00+09:00`);
         const diffMinutes = (dueDate.getTime() - now.getTime()) / 60000;
         if (diffMinutes < 0) continue;
 
-        // 24時間前通知
         if (diffMinutes <= 24 * 60) {
-          const { data: insertedCustom24h } = await supabase
-            .from("notified_assignments")
-            .upsert({ assignment_id: assignment.id, user_id: user.user_id, notified_at: new Date().toISOString(), notification_type: "custom_24h" }, { onConflict: "assignment_id,user_id,notification_type", ignoreDuplicates: true })
-            .select("id")
-            .single();
-
-          if (insertedCustom24h) {
-            fetch(`${process.env.CLOUD_RUN_URL}/process-custom-reminder`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "x-internal-secret": process.env.CLOUD_RUN_SECRET! },
-              body: JSON.stringify({ assignment, reminderType: "24h", discord_user_id: discordUserId }),
-            }).catch((e) => console.error("Cloud Run custom reminder error:", e));
+          const isCustom24h = await tryInsertNotification(assignment.id, user.user_id, "custom_24h");
+          if (isCustom24h) {
+            await callCloudRun("/process-custom-reminder", {
+              assignment,
+              reminderType: "24h",
+              discord_user_id: discordUserId,
+            });
           }
         }
 
-        // 設定リマインド通知（24h通知と重複しない範囲のみ）
         if (diffMinutes <= reminderMinutes && reminderMinutes < 22 * 60) {
-          const { data: insertedCustomReminder } = await supabase
-            .from("notified_assignments")
-            .upsert({ assignment_id: assignment.id, user_id: user.user_id, notified_at: new Date().toISOString(), notification_type: "custom_reminder" }, { onConflict: "assignment_id,user_id,notification_type", ignoreDuplicates: true })
-            .select("id")
-            .single();
-
-          if (insertedCustomReminder) {
-            fetch(`${process.env.CLOUD_RUN_URL}/process-custom-reminder`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "x-internal-secret": process.env.CLOUD_RUN_SECRET! },
-              body: JSON.stringify({ assignment, reminderType: "reminder", reminderMinutes, discord_user_id: discordUserId }),
-            }).catch((e) => console.error("Cloud Run custom reminder error:", e));
+          const isCustomReminder = await tryInsertNotification(assignment.id, user.user_id, "custom_reminder");
+          if (isCustomReminder) {
+            await callCloudRun("/process-custom-reminder", {
+              assignment,
+              reminderType: "reminder",
+              reminderMinutes,
+              discord_user_id: discordUserId,
+            });
           }
         }
       }
