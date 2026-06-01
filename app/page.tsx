@@ -876,7 +876,27 @@ function Section({ title, assignments, customAssignments = [], onToggleCustom, o
   userEmail?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  const total = assignments.length + customAssignments.length;
+
+  type MixedItem = { type: "classroom"; data: Assignment } | { type: "custom"; data: CustomAssignment };
+  const urgencyOrder = { high: 0, mid: 1, low: 2, none: 3, done: 4 };
+  const allItems: MixedItem[] = [
+    ...assignments.map((a) => ({ type: "classroom" as const, data: a })),
+    ...customAssignments.map((a) => ({ type: "custom" as const, data: a })),
+  ].sort((a, b) => {
+    const ua = a.type === "classroom" ? getUrgency(a.data.dueDate, a.data.submitted) : getUrgencyFromDateStr(a.data.due_date, a.data.submitted);
+    const ub = b.type === "classroom" ? getUrgency(b.data.dueDate, b.data.submitted) : getUrgencyFromDateStr(b.data.due_date, b.data.submitted);
+    if (ua !== ub) return urgencyOrder[ua] - urgencyOrder[ub];
+    const getDue = (item: MixedItem): number => {
+      if (item.type === "classroom") {
+        const d = item.data.dueDate;
+        return d ? new Date(d.year, d.month - 1, d.day).getTime() : Infinity;
+      }
+      return item.data.due_date ? new Date(item.data.due_date).getTime() : Infinity;
+    };
+    return getDue(a) - getDue(b);
+  });
+
+  const total = allItems.length;
   return (
     <div className="mb-5">
       <button
@@ -892,15 +912,11 @@ function Section({ title, assignments, customAssignments = [], onToggleCustom, o
           <p className="text-xs text-gray-400 pl-2 font-pixel" style={{ fontSize: "8px" }}>· NO TASKS ·</p>
         ) : (
           <>
-            {assignments.map((a) => <AssignmentCard key={a.id} assignment={a} userEmail={userEmail} />)}
-            {customAssignments.map((a) => (
-              <CustomAssignmentCard
-                key={a.id}
-                assignment={a}
-                onToggle={() => onToggleCustom?.(a.id)}
-                onDelete={() => onDeleteCustom?.(a.id)}
-              />
-            ))}
+            {allItems.map((item) =>
+              item.type === "classroom"
+                ? <AssignmentCard key={item.data.id} assignment={item.data} userEmail={userEmail} />
+                : <CustomAssignmentCard key={item.data.id} assignment={item.data} onToggle={() => onToggleCustom?.(item.data.id)} onDelete={() => onDeleteCustom?.(item.data.id)} />
+            )}
           </>
         )
       )}
@@ -1426,9 +1442,6 @@ export default function Home() {
       if (section === "nextWeek") return due > endOfThisWeek && due <= endOfNextWeek;
       if (section === "later") return due > endOfNextWeek;
       return false;
-    }).sort((a, b) => {
-      if (a.submitted === b.submitted) return 0;
-      return a.submitted ? 1 : -1;
     });
   };
 
@@ -1445,11 +1458,7 @@ export default function Home() {
   const allAssignments = data ? [...data.noDue, ...data.thisWeek, ...data.nextWeek, ...data.later] : [];
   const getPendingCount = (courseId: string) => allAssignments.filter((a) => a.courseId === courseId && !a.submitted).length;
   const filterByCourse = (assignments: Assignment[]) => {
-    const filtered = selectedCourseId ? assignments.filter((a) => a.courseId === selectedCourseId) : assignments;
-    return [...filtered].sort((a, b) => {
-      if (a.submitted === b.submitted) return 0;
-      return a.submitted ? 1 : -1;
-    });
+    return selectedCourseId ? assignments.filter((a) => a.courseId === selectedCourseId) : assignments;
   };
 
   const applySearch = (assignments: Assignment[]) => {
