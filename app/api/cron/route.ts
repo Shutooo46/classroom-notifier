@@ -20,6 +20,15 @@ async function tryInsertNotification(
   userId: string,
   notificationType: string
 ): Promise<boolean> {
+  const { data: existing } = await supabase
+    .from("notified_assignments")
+    .select("id")
+    .eq("assignment_id", assignmentId)
+    .eq("user_id", userId)
+    .eq("notification_type", notificationType)
+    .maybeSingle();
+  if (existing) return false;
+
   const { data } = await supabase
     .from("notified_assignments")
     .insert({ assignment_id: assignmentId, user_id: userId, notified_at: new Date().toISOString(), notification_type: notificationType })
