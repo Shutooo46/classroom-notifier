@@ -17,6 +17,9 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "Classroom Notifier",
   description: "Google Classroomの課題を自動検知して通知するアプリ",
+  icons: {
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({
