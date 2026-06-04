@@ -250,11 +250,11 @@ function CustomAssignmentCard({ assignment, onToggle, onDelete }: {
 
   const cardBase = "rounded-2xl p-4 mb-2 flex items-start justify-between transition-all border-dashed border-2";
   const cardStyle: Record<string, string> = {
-    done: `${cardBase} border-black dark:border-[#555] bg-gray-100 dark:bg-[#2a2a2a] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] opacity-60`,
-    high: `${cardBase} border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#ff6b6b] dark:border-l-[#ff6b6b]`,
-    mid:  `${cardBase} border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#c8f135] dark:border-l-[#c8f135]`,
-    low:  `${cardBase} border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#7dd3fc] dark:border-l-[#7dd3fc]`,
-    none: `${cardBase} border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555]`,
+    done: `${cardBase} border-black dark:border-[#555] bg-gray-100 dark:bg-[#6c6c6c] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] opacity-60`,
+    high: `${cardBase} border-black dark:border-[#555] bg-white dark:bg-[#6c6c6c] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#ff6b6b] dark:border-l-[#ff6b6b]`,
+    mid:  `${cardBase} border-black dark:border-[#555] bg-white dark:bg-[#6c6c6c] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#c8f135] dark:border-l-[#c8f135]`,
+    low:  `${cardBase} border-black dark:border-[#555] bg-white dark:bg-[#6c6c6c] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#7dd3fc] dark:border-l-[#7dd3fc]`,
+    none: `${cardBase} border-black dark:border-[#555] bg-white dark:bg-[#6c6c6c] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555]`,
   };
 
   const dueLabel = assignment.due_date
@@ -730,7 +730,7 @@ function CustomCourseCard({ course, pendingCount, onOpen, onDelete }: {
   }, [menuOpen]);
 
   return (
-    <div className="rounded-2xl p-4 mb-3 bg-white dark:bg-[#1e1e1e] border-dashed border-2 border-black dark:border-[#555] shadow-[4px_4px_0px_#1a1a1a] dark:shadow-[4px_4px_0px_#555] transition-all hover:shadow-[2px_2px_0px_#1a1a1a] dark:hover:shadow-[2px_2px_0px_#555] hover:translate-x-0.5 hover:translate-y-0.5">
+    <div className="rounded-2xl p-4 mb-3 bg-white dark:bg-[#6c6c6c] border-dashed border-2 border-black dark:border-[#555] shadow-[4px_4px_0px_#1a1a1a] dark:shadow-[4px_4px_0px_#555] transition-all hover:shadow-[2px_2px_0px_#1a1a1a] dark:hover:shadow-[2px_2px_0px_#555] hover:translate-x-0.5 hover:translate-y-0.5">
       <div className="flex items-center justify-between">
         <div className="flex-1 min-w-0 cursor-pointer" onClick={onOpen}>
           <p className="font-semibold text-black dark:text-white truncate text-sm">{course.name}</p>
@@ -781,11 +781,11 @@ function AssignmentCard({ assignment, userEmail }: { assignment: Assignment; use
   const urgency = getUrgency(assignment.dueDate, assignment.submitted);
 
   const cardStyle: Record<string, string> = {
-    done: "bg-gray-100 dark:bg-[#2a2a2a] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] opacity-60",
-    high: "bg-white dark:bg-[#2a2a2a] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#ff6b6b] dark:border-l-[#ff6b6b]",
-    mid: "bg-white dark:bg-[#2a2a2a] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#c8f135] dark:border-l-[#c8f135]",
-    low: "bg-white dark:bg-[#2a2a2a] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#7dd3fc] dark:border-l-[#7dd3fc]",
-    none: "bg-white dark:bg-[#2a2a2a] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555]",
+    done: "bg-gray-100 dark:bg-[#6c6c6c] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] opacity-60",
+    high: "bg-white dark:bg-[#6c6c6c] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#ff6b6b] dark:border-l-[#ff6b6b]",
+    mid: "bg-white dark:bg-[#6c6c6c] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#c8f135] dark:border-l-[#c8f135]",
+    low: "bg-white dark:bg-[#6c6c6c] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555] border-l-[6px] border-l-[#7dd3fc] dark:border-l-[#7dd3fc]",
+    none: "bg-white dark:bg-[#6c6c6c] border-2 border-black dark:border-[#555] shadow-[3px_3px_0px_#1a1a1a] dark:shadow-[3px_3px_0px_#555]",
   };
 
   const titleStyle: Record<string, string> = {
@@ -967,7 +967,7 @@ function CourseCard({
   }, [menuOpen]);
 
   return (
-    <div className="rounded-2xl p-4 mb-3 bg-white dark:bg-[#1e1e1e] border-2 border-black dark:border-[#555] shadow-[4px_4px_0px_#1a1a1a] dark:shadow-[4px_4px_0px_#555] transition-all hover:shadow-[2px_2px_0px_#1a1a1a] dark:hover:shadow-[2px_2px_0px_#555] hover:translate-x-0.5 hover:translate-y-0.5">
+    <div className="rounded-2xl p-4 mb-3 bg-white dark:bg-[#6c6c6c] border-2 border-black dark:border-[#555] shadow-[4px_4px_0px_#1a1a1a] dark:shadow-[4px_4px_0px_#555] transition-all hover:shadow-[2px_2px_0px_#1a1a1a] dark:hover:shadow-[2px_2px_0px_#555] hover:translate-x-0.5 hover:translate-y-0.5">
       <div className="flex items-center justify-between">
         <div className="flex-1 min-w-0 cursor-pointer" onClick={onOpen}>
           <p className="font-semibold text-black dark:text-white truncate text-sm">{course.name}</p>
