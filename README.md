@@ -1,36 +1,72 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Classroom Notifier
 
-## Getting Started
+Google Classroom の課題・お知らせを自動検知して Discord に通知するアプリです。
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 主な機能
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 📚 Google Classroom 連携
+- 新しい課題・お知らせ・資料の投稿を自動検知して Discord DM で通知
+- Gemini AI が課題内容（添付 PDF 含む）を3行以内で要約
+- 期限24時間前の自動リマインド
+- 設定した時間前（例: 30分前）のカスタムリマインド
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### ✏️ カスタム課題
+- Google Classroom にない課題を手動で登録
+- 期限・授業名・時刻を設定可能
+- 提出済みチェックで管理
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 🔄 繰り返し課題
+- 毎週同じ曜日に出る課題をテンプレートとして登録
+- 出題曜日に自動で課題を生成し Discord に通知
+- 2週ごとなど間隔の設定も可能
 
-## Learn More
+### 🔔 通知設定
+- コースごとに通知を ON/OFF
+- 非表示にしたいコースを隠す
+- お知らせ・資料投稿の通知を個別に OFF 可能
+- リマインド時間を自由に設定（推奨: 30〜60分）
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 使い方
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 1. ログイン
+Google アカウントでサインイン → 自動的に Google Classroom の情報を取得
 
-## Deploy on Vercel
+### 2. Discord 連携
+設定画面から Discord アカウントと連携（ユーザー ID を登録）
+→ 以降、通知が Discord DM で届く
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 3. 通知の種類
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| 通知 | タイミング |
+|------|-----------|
+| 📚 新しい課題 | 課題が追加されたとき（AI 要約付き） |
+| ⏰ 24時間前 | 期限の24時間前 |
+| 🚨 リマインド | 設定した時間前（デフォルト60分） |
+| 📢 お知らせ | 先生がお知らせを投稿したとき |
+| 📁 資料 | 先生が資料を投稿したとき（AI 要約付き） |
+
+### 4. 課題一覧
+- **緊急度順**（High → Mid → Low）× **期限の近い順**で表示
+- Google Classroom の課題とカスタム課題を混在表示
+- 提出済みは一番下に移動
+
+### 5. iPhone でホーム画面に追加
+Safari でサイトを開き、共有ボタン →「ホーム画面に追加」でアプリとして使える
+
+---
+
+## 技術スタック
+
+| 役割 | 技術 |
+|------|------|
+| フロントエンド | Next.js 16 (App Router) |
+| 認証 | NextAuth.js (Google OAuth) |
+| DB | Supabase |
+| AI 要約 | Google Gemini 2.5 Flash |
+| バックグラウンド処理 | Google Cloud Run |
+| 通知 | Discord Bot API |
+| デプロイ | Vercel |
