@@ -278,7 +278,7 @@ function CustomAssignmentCard({ assignment, onToggle, onDelete }: {
           <p className={`text-sm font-semibold truncate ${assignment.submitted ? "text-gray-400 line-through" : "text-black dark:text-white"}`}>
             {assignment.title}
           </p>
-          <p className="text-xs text-gray-500 mt-0.5 truncate">{assignment.course_name}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-200 mt-0.5 truncate">{assignment.course_name}</p>
           <div className="flex items-center gap-2 mt-1.5">
             <UrgencyBadge dueDate={assignment.due_date ? (() => { const d = new Date(assignment.due_date!); return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() }; })() : undefined} submitted={assignment.submitted} />
             {dueLabel && <span className="text-xs text-gray-400">{dueLabel}</span>}
@@ -797,11 +797,11 @@ function AssignmentCard({ assignment, userEmail }: { assignment: Assignment; use
   };
 
   const subStyle: Record<string, string> = {
-    done: "text-gray-400",
-    high: "text-gray-500",
-    mid: "text-gray-500",
-    low: "text-gray-500",
-    none: "text-gray-500",
+    done: "text-gray-400 dark:text-gray-300",
+    high: "text-gray-500 dark:text-gray-200",
+    mid: "text-gray-500 dark:text-gray-200",
+    low: "text-gray-500 dark:text-gray-200",
+    none: "text-gray-500 dark:text-gray-200",
   };
 
   const checkStyle: Record<string, string> = {
@@ -993,7 +993,15 @@ function CourseCard({
               </svg>
             </button>
           )}
-          <div className="relative" ref={menuRef}>
+          <div className="flex items-center gap-1.5" ref={menuRef}>
+            {menuOpen && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onHide(); }}
+                className="px-3 py-1.5 rounded-lg border-2 border-red-400 text-xs font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors whitespace-nowrap"
+              >
+                非表示にする
+              </button>
+            )}
             <button
               onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
               className="p-1.5 rounded-lg border-2 border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] hover:bg-gray-100 dark:hover:bg-[#333] transition-colors"
@@ -1002,16 +1010,6 @@ function CourseCard({
                 <circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" />
               </svg>
             </button>
-            {menuOpen && (
-              <div className="absolute right-0 top-10 w-36 bg-white dark:bg-[#2a2a2a] border-2 border-black dark:border-[#555] rounded-xl shadow-[4px_4px_0px_#1a1a1a] dark:shadow-[4px_4px_0px_#555] z-10 py-1 overflow-hidden">
-                <button
-                  onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onHide(); }}
-                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                >
-                  非表示にする
-                </button>
-              </div>
-            )}
           </div>
           <button onClick={onOpen} className="p-1.5 rounded-lg border-2 border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] hover:bg-[#c8f135] dark:hover:bg-[#c8f135] transition-colors">
             <svg className="w-4 h-4 stroke-black dark:stroke-white" fill="none" viewBox="0 0 24 24" strokeWidth={2.5}>
