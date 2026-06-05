@@ -1420,8 +1420,15 @@ export default function Home() {
   };
 
   const selectedCustomCourse = customCourses.find((c) => c.id === selectedCustomCourseId);
-  const getCustomCoursePendingCount = (courseName: string) =>
-    customAssignments.filter((a) => a.course_name === courseName && !a.submitted).length;
+  const getCustomCoursePendingCount = (courseName: string) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return customAssignments.filter((a) => {
+      if (a.submitted || a.course_name !== courseName) return false;
+      if (!a.due_date) return true;
+      return new Date(a.due_date) >= today;
+    }).length;
+  };
 
   const getCustomForSection = (section: "noDue" | "thisWeek" | "nextWeek" | "later") => {
     const now = new Date();
