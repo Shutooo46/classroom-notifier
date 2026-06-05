@@ -366,10 +366,10 @@ app.post("/process-custom-reminder", async (req, res) => {
       const diffM = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
       const remaining = diffH > 0 ? `${diffH}時間${diffM}分` : `${diffM}分`;
       title = `🚨 期限まであと${remaining}！`;
-      color = 0xff6b6b;
+      color = 0xff0000;
     } else {
-      title = "⏰ カスタム課題 - 24時間前リマインド";
-      color = 0xffa500;
+      title = "⏰ 期限まで24時間を切りました！";
+      color = 0xff6600;
     }
 
     const embed = {
