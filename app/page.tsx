@@ -1502,7 +1502,24 @@ export default function Home() {
   };
 
   if (status === "loading") {
-    return <div className="flex items-center justify-center min-h-screen" />;
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+        <div className="text-center">
+          <p className="font-pixel text-black dark:text-white mb-1" style={{ fontSize: "11px" }}>CLASSROOM</p>
+          <p className="font-pixel text-black dark:text-white" style={{ fontSize: "11px" }}>NOTIFIER</p>
+        </div>
+        <div className="flex gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="w-2 h-2 rounded-full bg-[#c8f135] border border-black"
+              style={{ animation: `bounce 0.9s ${i * 0.2}s infinite` }}
+            />
+          ))}
+        </div>
+        <style>{`@keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }`}</style>
+      </div>
+    );
   }
 
   if (!session) {
