@@ -1301,7 +1301,7 @@ function SettingsModal({ onClose, courses, settings, onSave, userEmail, theme, o
 
 // ---- メイン ----
 export default function Home() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [data, setData] = useState<ClassroomData | null>(null);
   const [settings, setSettings] = useState<UserSettings>({
     reminder_minutes: 60, course_settings: {}, per_course_notify: false,
@@ -1501,21 +1501,94 @@ export default function Home() {
     setHideTarget(null);
   };
 
+  if (status === "loading") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+        <div className="text-center">
+          <p className="font-pixel text-black dark:text-white mb-1" style={{ fontSize: "11px" }}>CLASSROOM</p>
+          <p className="font-pixel text-black dark:text-white" style={{ fontSize: "11px" }}>NOTIFIER</p>
+        </div>
+        <div className="flex gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="w-2 h-2 rounded-full bg-[#c8f135] border border-black"
+              style={{ animation: `bounce 0.9s ${i * 0.2}s infinite` }}
+            />
+          ))}
+        </div>
+        <style>{`@keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }`}</style>
+      </div>
+    );
+  }
+
   if (!session) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-8">
-        <div className="text-center">
-          <p className="font-pixel text-black dark:text-white mb-3" style={{ fontSize: "11px" }}>CLASSROOM</p>
-          <p className="font-pixel text-black dark:text-white" style={{ fontSize: "11px" }}>NOTIFIER</p>
-          <div className="w-32 h-1 bg-[#c8f135] mx-auto mt-4 rounded-full border border-black" />
-        </div>
-        <button
-          onClick={() => signIn("google")}
-          className="font-pixel px-8 py-4 rounded-2xl border-2 border-black bg-black text-[#c8f135] shadow-[4px_4px_0px_#555] hover:shadow-[2px_2px_0px_#555] hover:translate-x-0.5 hover:translate-y-0.5 transition-all"
-          style={{ fontSize: "9px" }}
-        >
-          START · GOOGLE LOGIN
-        </button>
+      <div className="min-h-screen bg-white dark:bg-[#1a1a1a] flex flex-col">
+        {/* Header */}
+        <header className="px-6 py-5 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-3">
+            <div>
+              <p className="font-pixel text-black dark:text-white leading-none" style={{ fontSize: "10px" }}>CLASSROOM</p>
+              <p className="font-pixel text-black dark:text-white leading-none mt-0.5" style={{ fontSize: "10px" }}>NOTIFIER</p>
+            </div>
+          </div>
+          <button
+            onClick={() => signIn("google")}
+            className="font-pixel px-5 py-2.5 rounded-xl border-2 border-black bg-black text-[#c8f135] shadow-[3px_3px_0px_#555] hover:shadow-[1px_1px_0px_#555] hover:translate-x-0.5 hover:translate-y-0.5 transition-all"
+            style={{ fontSize: "8px" }}
+          >
+            LOGIN
+          </button>
+        </header>
+
+        {/* Hero */}
+        <section className="flex flex-col items-center justify-center text-center px-6 py-16 flex-1">
+          <div className="mb-8">
+            <p className="font-pixel text-black dark:text-white mb-1" style={{ fontSize: "18px" }}>CLASSROOM</p>
+            <p className="font-pixel text-black dark:text-white" style={{ fontSize: "18px" }}>NOTIFIER</p>
+            <div className="w-40 h-1.5 bg-[#c8f135] mx-auto mt-4 rounded-full border border-black" />
+          </div>
+          <p className="text-gray-700 dark:text-gray-300 text-base leading-relaxed max-w-sm mb-10">
+            Google Classroom の課題・お知らせを<br />Discord に自動で通知するアプリです。
+          </p>
+          <button
+            onClick={() => signIn("google")}
+            className="font-pixel px-10 py-5 rounded-2xl border-2 border-black bg-black text-[#c8f135] shadow-[5px_5px_0px_#555] hover:shadow-[2px_2px_0px_#555] hover:translate-x-0.5 hover:translate-y-0.5 transition-all mb-3"
+            style={{ fontSize: "9px" }}
+          >
+            START · GOOGLE LOGIN
+          </button>
+          <p className="text-xs text-gray-400">Google アカウントでサインイン</p>
+        </section>
+
+        {/* Features */}
+        <section className="px-6 py-12 bg-gray-50 dark:bg-[#111]">
+          <h2 className="font-pixel text-center text-black dark:text-white mb-8" style={{ fontSize: "10px" }}>FEATURES</h2>
+          <div className="grid grid-cols-1 gap-4 max-w-md mx-auto">
+            {[
+              { icon: "📚", title: "新着課題を即通知", desc: "Classroom に課題が追加されると AI 要約付きで Discord DM に届く" },
+              { icon: "⏰", title: "期限リマインド", desc: "24時間前＆カスタム時間前に自動でリマインド通知" },
+              { icon: "✏️", title: "カスタム課題管理", desc: "Classroom にない課題も手動登録して一元管理" },
+              { icon: "🔄", title: "繰り返し課題", desc: "毎週同じ曜日の課題をテンプレート登録して自動生成" },
+            ].map(({ icon, title, desc }) => (
+              <div key={title} className="flex gap-4 p-4 bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-gray-700">
+                <span className="text-2xl flex-shrink-0">{icon}</span>
+                <div>
+                  <p className="font-semibold text-sm text-gray-900 dark:text-white mb-1">{title}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">{desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Footer */}
+        <footer className="px-6 py-6 text-center text-xs text-gray-400 border-t border-gray-200 dark:border-gray-700">
+          <a href="/privacy" className="underline hover:text-gray-600">プライバシーポリシー</a>
+          <span className="mx-2">·</span>
+          <span>© 2026 Classroom Notifier</span>
+        </footer>
       </div>
     );
   }
