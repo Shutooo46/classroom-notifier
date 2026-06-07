@@ -31,6 +31,7 @@ export default function RootLayout({
   return (
     <html lang="ja" className={`${pressStart.variable} ${dmSans.variable}`} suppressHydrationWarning>
       <head>
+        <link rel="icon" href="/favicon.png" type="image/png" />
         <script dangerouslySetInnerHTML={{ __html: `(function(){if(localStorage.getItem('theme')==='dark')document.documentElement.classList.add('dark');})()` }} />
       </head>
       <body>
