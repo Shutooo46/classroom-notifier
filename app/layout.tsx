@@ -18,7 +18,6 @@ export const metadata: Metadata = {
   title: "Classroom Notifier",
   description: "Google Classroomの課題を自動検知して通知するアプリ",
   icons: {
-    icon: "/favicon.png",
     apple: "/apple-touch-icon.png",
   },
 };
