@@ -2,6 +2,10 @@
 
 Google Classroom の課題・お知らせを自動検知して Discord に通知するアプリです。
 
+> **⚠️ 現在テストモードで公開中**
+> Google OAuth の審査待ちのため、現在は承認済みのユーザーのみログインできます。
+> 使いたい方は [kususyuto@gmail.com](mailto:kususyuto@gmail.com) または Discord までご連絡ください。
+
 ---
 
 ## 主な機能
