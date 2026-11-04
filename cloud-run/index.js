@@ -62,7 +62,7 @@ async function sendDiscordDM(discordUserId, embed) {
   const dm = await dmRes.json();
   if (!dm.id) {
     console.error("Failed to create DM channel:", dm);
-    throw new Error("Failed to create DM channel");
+    throw discordError("Failed to create DM channel", dm);
   }
   const msgRes = await fetch(`https://discord.com/api/v10/channels/${dm.id}/messages`, {
     method: "POST",
@@ -75,8 +75,29 @@ async function sendDiscordDM(discordUserId, embed) {
   if (!msgRes.ok) {
     const err = await msgRes.text();
     console.error("Failed to send DM:", err);
-    throw new Error("Failed to send DM");
+    throw discordError("Failed to send DM", err);
   }
+}
+
+// Discord 側の理由で、再送しても絶対に届かないエラー
+// 50007: Cannot send messages to this user / 50278: no mutual guilds
+const PERMANENT_DISCORD_CODES = new Set([50007, 50278]);
+
+function discordError(message, body) {
+  const e = new Error(message);
+  try {
+    const code = (typeof body === "string" ? JSON.parse(body) : body)?.code;
+    e.permanent = PERMANENT_DISCORD_CODES.has(code);
+  } catch {
+    e.permanent = false;
+  }
+  return e;
+}
+
+// 422 = 恒久的に送れない（cron 側は再送しない）、500 = 一時的な失敗（cron 側が次回再送する）
+function sendError(res, e) {
+  console.error(e);
+  res.status(e?.permanent ? 422 : 500).json({ error: String(e) });
 }
 
 const GOOGLE_NATIVE_EXPORTABLE = {
@@ -224,8 +245,7 @@ app.post("/process", async (req, res) => {
 
     res.json({ message: "Done" });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: String(e) });
+    sendError(res, e);
   }
 });
 
@@ -271,8 +291,7 @@ app.post("/process-classroom-reminder", async (req, res) => {
 
     res.json({ message: "Done" });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: String(e) });
+    sendError(res, e);
   }
 });
 
@@ -303,8 +322,7 @@ app.post("/process-announcement", async (req, res) => {
 
     res.json({ message: "Done" });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: String(e) });
+    sendError(res, e);
   }
 });
 
@@ -337,8 +355,7 @@ app.post("/process-material", async (req, res) => {
 
     res.json({ message: "Done" });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: String(e) });
+    sendError(res, e);
   }
 });
 
@@ -386,8 +403,31 @@ app.post("/process-custom-reminder", async (req, res) => {
 
     res.json({ message: "Done" });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: String(e) });
+    sendError(res, e);
+  }
+});
+
+app.post("/process-reauth", async (req, res) => {
+  const { discord_user_id, login_url } = req.body;
+  if (!discord_user_id) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  try {
+    const embed = {
+      title: "🔑 再ログインが必要です",
+      color: 0x9e9e9e,
+      description:
+        "Google の認証が切れたため、Classroom の課題・お知らせを取得できなくなっています。\n" +
+        "下のリンクからもう一度ログインすると通知が再開します。" +
+        (login_url ? `\n\n${login_url}` : ""),
+    };
+
+    await sendDiscordDM(discord_user_id, embed);
+
+    res.json({ message: "Done" });
+  } catch (e) {
+    sendError(res, e);
   }
 });
 
