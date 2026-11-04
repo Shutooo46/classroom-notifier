@@ -1,5 +1,13 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import {
+  LMS_REAUTH_NOTIFICATION_TYPE,
+  LMS_SEEN_NOTIFICATION_TYPE,
+  LmsUrlError,
+  fetchLmsEvents,
+  lmsNotificationId,
+  syncLmsAssignments,
+} from "@/lib/lms";
 
 export const maxDuration = 300;
 
@@ -156,8 +164,46 @@ async function processUser(user: UserToken, pending: Promise<void>[]): Promise<v
     }
   }
 
+  // 列が未作成（マイグレーション前）でも他の通知に影響しないよう、別クエリで取得する
+  const { data: lmsSettings } = await supabase
+    .from("user_settings")
+    .select("lms_ical_url")
+    .eq("user_id", user.user_id)
+    .maybeSingle();
+  const lmsIcalUrl: string | null = lmsSettings?.lms_ical_url ?? null;
+
+  // ポータルの課題は custom_assignments に入るので、同じ実行でリマインドも判定されるよう先に同期する
+  if (lmsIcalUrl) {
+    try {
+      await processLms(lmsIcalUrl);
+    } catch (e) {
+      if (e instanceof LmsUrlError) {
+        console.warn(`cron: LMS calendar URL for user ${user.user_id} is invalid:`, e.message);
+        await notifyOnce(LMS_REAUTH_NOTIFICATION_TYPE, user.user_id, LMS_REAUTH_NOTIFICATION_TYPE, "/process-reauth", {
+          discord_user_id: discordUserId,
+          kind: "lms",
+          login_url: process.env.NEXTAUTH_URL ?? "https://classroom-notifier.vercel.app",
+        });
+      } else {
+        console.error(`cron: LMS sync failed for user ${user.user_id}:`, e);
+      }
+    }
+  }
+
   // カスタム課題・繰り返し課題は Google トークンに依存しないので、Classroom 側が失敗しても続行する
   await processCustom();
+
+  async function processLms(url: string): Promise<void> {
+    const events = await fetchLmsEvents(url);
+    await releaseNotification(LMS_REAUTH_NOTIFICATION_TYPE, user.user_id, LMS_REAUTH_NOTIFICATION_TYPE);
+    await syncLmsAssignments(user.user_id, events, async (row, uid) => {
+      await notifyOnce(lmsNotificationId(uid), user.user_id, LMS_SEEN_NOTIFICATION_TYPE, "/process-custom-reminder", {
+        assignment: row,
+        reminderType: "lms_new",
+        discord_user_id: discordUserId,
+      });
+    });
+  }
 
   async function refreshAccessToken(): Promise<string> {
     if (user.expires_at && Date.now() / 1000 <= user.expires_at - 300) {

@@ -1062,6 +1062,98 @@ function PickerColumn({ values, selected, onChange, label }: {
 }
 
 // ---- 設定モーダル ----
+// ---- 学校ポータル（Moodle）カレンダー連携 ----
+function LmsSection() {
+  const [status, setStatus] = useState<{ connected: boolean; host: string | null } | null>(null);
+  const [url, setUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/lms").then((r) => r.json()).then(setStatus).catch(() => setStatus({ connected: false, host: null }));
+  }, []);
+
+  const connect = async () => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/lms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage({ type: "error", text: data.error ?? "連携に失敗しました" });
+        return;
+      }
+      setUrl("");
+      setStatus({ connected: true, host: new URL(url.trim()).hostname });
+      setMessage({ type: "ok", text: `${data.imported}件の課題を取り込みました。ページを再読み込みすると一覧に表示されます。` });
+    } catch {
+      setMessage({ type: "error", text: "連携に失敗しました" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const disconnect = async () => {
+    setBusy(true);
+    await fetch("/api/lms", { method: "DELETE" });
+    setStatus({ connected: false, host: null });
+    setMessage(null);
+    setBusy(false);
+  };
+
+  return (
+    <div>
+      <p className="font-pixel text-black dark:text-white mb-3" style={{ fontSize: "8px" }}>PORTAL</p>
+      <div className="py-2 border-b border-gray-100 dark:border-[#333] space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-black dark:text-white">学校ポータル（Moodle）</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {status === null ? "読み込み中…" : status.connected
+                ? <span>連携済み <span className="text-[#c8f135]">✓</span> {status.host}</span>
+                : "未連携"}
+            </p>
+          </div>
+          {status?.connected && (
+            <button onClick={disconnect} disabled={busy}
+              className="text-xs px-3 py-1.5 rounded-full border-2 border-black bg-white text-red-500 font-semibold hover:bg-red-50 transition-colors disabled:opacity-50">
+              解除
+            </button>
+          )}
+        </div>
+        {status && !status.connected && (
+          <>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              ポータルの「カレンダーをエクスポートする」で取得した URL を貼り付けてください。
+              パスワードは不要です。課題はカスタム課題として追加され、新しい課題は Discord に通知されます。
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://…/calendar/export_execute.php?…"
+                className="flex-1 min-w-0 text-xs px-3 py-2 rounded-xl border-2 border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] text-black dark:text-white"
+              />
+              <button onClick={connect} disabled={busy || !url.trim()}
+                className="text-xs px-3 py-1.5 rounded-full border-2 border-black bg-[#c8f135] text-black font-semibold hover:opacity-80 transition-opacity disabled:opacity-50 shrink-0">
+                {busy ? "確認中…" : "連携する"}
+              </button>
+            </div>
+          </>
+        )}
+        {message && (
+          <p className={`text-xs ${message.type === "ok" ? "text-green-600 dark:text-[#c8f135]" : "text-red-500"}`}>{message.text}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SettingsModal({ onClose, courses, settings, onSave, userEmail, theme, onThemeChange }: {
   onClose: () => void; courses: Course[]; settings: UserSettings;
   onSave: (patch: Partial<UserSettings>) => Promise<void>;
@@ -1201,6 +1293,7 @@ function SettingsModal({ onClose, courses, settings, onSave, userEmail, theme, o
                   </div>
                 </div>
               </div>
+              <LmsSection />
             </div>
           )}
 
