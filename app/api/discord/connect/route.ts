@@ -13,7 +13,8 @@ export async function GET() {
     client_id: process.env.DISCORD_CLIENT_ID!,
     redirect_uri: `${process.env.NEXTAUTH_URL}/api/discord/callback`,
     response_type: "code",
-    scope: "identify",
+    // guilds.join: 通知用サーバーへ自動参加させる。Bot は共通サーバーのないユーザーに DM できないため
+    scope: "identify guilds.join",
     state,
   });
 
