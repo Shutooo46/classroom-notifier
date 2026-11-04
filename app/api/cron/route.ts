@@ -3,15 +3,23 @@ import { supabase } from "@/lib/supabase";
 
 export const maxDuration = 300;
 
-async function callCloudRun(path: string, body: Record<string, unknown>): Promise<void> {
-  const res = await fetch(`${process.env.CLOUD_RUN_URL}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-internal-secret": process.env.CLOUD_RUN_SECRET! },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
+type CloudRunResult = "ok" | "retry" | "permanent";
+
+async function callCloudRun(path: string, body: Record<string, unknown>): Promise<CloudRunResult> {
+  try {
+    const res = await fetch(`${process.env.CLOUD_RUN_URL}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-internal-secret": process.env.CLOUD_RUN_SECRET! },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) return "ok";
     const text = await res.text().catch(() => "");
     console.error(`Cloud Run ${path} error ${res.status}:`, text);
+    // 422 = Discord 側で恒久的に送れない（Bot と共通サーバーがない等）。再送しても無駄なので記録は残す
+    return res.status === 422 ? "permanent" : "retry";
+  } catch (e) {
+    console.error(`Cloud Run ${path} request failed:`, e);
+    return "retry";
   }
 }
 
@@ -37,6 +45,47 @@ async function tryInsertNotification(
   return data !== null;
 }
 
+async function releaseNotification(assignmentId: string, userId: string, notificationType: string): Promise<void> {
+  await supabase
+    .from("notified_assignments")
+    .delete()
+    .eq("assignment_id", assignmentId)
+    .eq("user_id", userId)
+    .eq("notification_type", notificationType);
+}
+
+/**
+ * 未通知なら記録して Cloud Run に送信する。送信に失敗したら記録を消し、次回の cron で再送させる。
+ */
+async function notifyOnce(
+  assignmentId: string,
+  userId: string,
+  notificationType: string,
+  path: string,
+  body: Record<string, unknown>
+): Promise<void> {
+  const inserted = await tryInsertNotification(assignmentId, userId, notificationType);
+  if (!inserted) return;
+  const result = await callCloudRun(path, body);
+  if (result === "retry") {
+    await releaseNotification(assignmentId, userId, notificationType);
+  }
+}
+
+const REAUTH_NOTIFICATION_TYPE = "reauth_required";
+
+class GoogleAuthError extends Error {}
+
+async function fetchGoogle(url: string, accessToken: string) {
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (res.status === 401) throw new GoogleAuthError(`401 from ${url}`);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Google API ${res.status} ${url}: ${text.slice(0, 300)}`);
+  }
+  return res.json();
+}
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -48,219 +97,261 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: "No users found" });
   }
 
+  // Gemini 要約を伴う通知は時間がかかるので並行で投げ、レスポンス前にまとめて待つ
+  // （await せずに返すと Vercel の関数終了時にリクエストが失われる）
+  const pending: Promise<void>[] = [];
+
   for (const user of users) {
-    let accessToken = user.access_token;
-    if (Date.now() / 1000 > user.expires_at - 300) {
-      try {
-        const res = await fetch("https://oauth2.googleapis.com/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            client_id: process.env.GOOGLE_CLIENT_ID!,
-            client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-            grant_type: "refresh_token",
-            refresh_token: user.refresh_token,
-          }),
-        });
-        const tokens = await res.json();
-        if (tokens.access_token) {
-          accessToken = tokens.access_token;
-          await supabase.from("user_tokens").update({
-            access_token: tokens.access_token,
-            expires_at: Math.floor(Date.now() / 1000 + tokens.expires_in),
-          }).eq("user_id", user.user_id);
-        }
-      } catch {
-        continue;
-      }
+    try {
+      await processUser(user, pending);
+    } catch (e) {
+      console.error(`cron: user ${user.user_id} failed:`, e);
     }
+  }
 
-    const { data: settings } = await supabase
-      .from("user_settings")
-      .select("reminder_minutes, course_settings, per_course_notify, notify_announcements, notify_materials, discord_user_id")
-      .eq("user_id", user.user_id)
-      .single();
-    const reminderMinutes = settings?.reminder_minutes ?? 60;
-    const courseSettings: Record<string, { notify: boolean; hidden?: boolean }> = settings?.course_settings ?? {};
-    const perCourseNotify: boolean = settings?.per_course_notify ?? false;
-    const notifyAnnouncements: boolean = settings?.notify_announcements ?? true;
-    const notifyMaterials: boolean = settings?.notify_materials ?? true;
-    const discordUserId: string | null = settings?.discord_user_id ?? null;
+  await Promise.allSettled(pending);
 
-    if (!discordUserId) continue;
+  return NextResponse.json({ message: "Done" });
+}
 
-    const coursesRes = await fetch(
+async function notifyReauthRequired(userId: string, discordUserId: string): Promise<void> {
+  console.warn(`cron: Google token for user ${userId} is invalid; re-login required`);
+  await notifyOnce(REAUTH_NOTIFICATION_TYPE, userId, REAUTH_NOTIFICATION_TYPE, "/process-reauth", {
+    discord_user_id: discordUserId,
+    login_url: process.env.NEXTAUTH_URL ?? "https://classroom-notifier.vercel.app",
+  });
+}
+
+type UserToken = {
+  user_id: string;
+  access_token: string;
+  refresh_token: string;
+  expires_at: number | null;
+};
+
+type Course = { id: string; name: string };
+
+async function processUser(user: UserToken, pending: Promise<void>[]): Promise<void> {
+  const { data: settings } = await supabase
+    .from("user_settings")
+    .select("reminder_minutes, course_settings, per_course_notify, notify_announcements, notify_materials, discord_user_id")
+    .eq("user_id", user.user_id)
+    .single();
+  const reminderMinutes = settings?.reminder_minutes ?? 60;
+  const courseSettings: Record<string, { notify: boolean; hidden?: boolean }> = settings?.course_settings ?? {};
+  const perCourseNotify: boolean = settings?.per_course_notify ?? false;
+  const notifyAnnouncements: boolean = settings?.notify_announcements ?? true;
+  const notifyMaterials: boolean = settings?.notify_materials ?? true;
+  const discordUserId: string | null = settings?.discord_user_id ?? null;
+
+  if (!discordUserId) return;
+
+  try {
+    await processClassroom();
+  } catch (e) {
+    if (e instanceof GoogleAuthError) {
+      await notifyReauthRequired(user.user_id, discordUserId);
+    } else {
+      console.error(`cron: classroom processing failed for user ${user.user_id}:`, e);
+    }
+  }
+
+  // カスタム課題・繰り返し課題は Google トークンに依存しないので、Classroom 側が失敗しても続行する
+  await processCustom();
+
+  async function refreshAccessToken(): Promise<string> {
+    if (user.expires_at && Date.now() / 1000 <= user.expires_at - 300) {
+      return user.access_token;
+    }
+    const res = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: process.env.GOOGLE_CLIENT_ID!,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+        grant_type: "refresh_token",
+        refresh_token: user.refresh_token,
+      }),
+    });
+    const tokens = await res.json().catch(() => ({}));
+    if (!tokens.access_token) {
+      if (tokens.error === "invalid_grant" || res.status === 400 || res.status === 401) {
+        throw new GoogleAuthError(`refresh failed: ${tokens.error ?? res.status}`);
+      }
+      throw new Error(`token refresh failed: ${res.status} ${JSON.stringify(tokens)}`);
+    }
+    await supabase.from("user_tokens").update({
+      access_token: tokens.access_token,
+      expires_at: Math.floor(Date.now() / 1000 + tokens.expires_in),
+    }).eq("user_id", user.user_id);
+    return tokens.access_token;
+  }
+
+  async function processClassroom(): Promise<void> {
+    const accessToken = await refreshAccessToken();
+
+    const coursesData = await fetchGoogle(
       "https://classroom.googleapis.com/v1/courses?courseStates=ACTIVE",
-      { headers: { Authorization: `Bearer ${accessToken}` } }
+      accessToken
     );
-    const coursesData = await coursesRes.json();
-    const courses = coursesData.courses || [];
+    const courses: Course[] = coursesData.courses || [];
+
+    // ここまで来れば Google 認証は有効。再ログイン案内の記録を消し、次に失効したらまた通知できるようにする
+    await releaseNotification(REAUTH_NOTIFICATION_TYPE, user.user_id, REAUTH_NOTIFICATION_TYPE);
 
     for (const course of courses) {
       if (courseSettings[course.id]?.hidden) continue;
       if (perCourseNotify && courseSettings[course.id]?.notify === false) continue;
-      const workRes = await fetch(
-        `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
+
+      try {
+        await processCourse(course, accessToken);
+      } catch (e) {
+        if (e instanceof GoogleAuthError) throw e;
+        console.error(`cron: course ${course.id} failed for user ${user.user_id}:`, e);
+      }
+    }
+  }
+
+  async function processCourse(course: Course, accessToken: string): Promise<void> {
+    const twoWeeksAgo = new Date();
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+
+    const workData = await fetchGoogle(
+      `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork`,
+      accessToken
+    );
+    const assignments = workData.courseWork || [];
+
+    for (const assignment of assignments) {
+      if (assignment.dueDate) {
+        const due = new Date(Date.UTC(
+          assignment.dueDate.year,
+          assignment.dueDate.month - 1,
+          assignment.dueDate.day
+        ));
+        if (due < twoWeeksAgo) continue;
+      } else {
+        const createdAt = new Date(assignment.creationTime);
+        if (createdAt < twoWeeksAgo) continue;
+      }
+
+      const subData = await fetchGoogle(
+        `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork/${assignment.id}/studentSubmissions`,
+        accessToken
       );
-      const workData = await workRes.json();
-      const assignments = workData.courseWork || [];
+      const submission = subData.studentSubmissions?.[0];
+      const submissionState = submission?.state || "NEW";
+      const submitted =
+        submissionState === "TURNED_IN" ||
+        submissionState === "SUBMITTED" ||
+        submissionState === "RETURNED";
 
-      for (const assignment of assignments) {
-        if (assignment.dueDate) {
-          const due = new Date(Date.UTC(
-            assignment.dueDate.year,
-            assignment.dueDate.month - 1,
-            assignment.dueDate.day
-          ));
-          const twoWeeksAgo = new Date();
-          twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-          if (due < twoWeeksAgo) continue;
-        } else {
-          const createdAt = new Date(assignment.creationTime);
-          const twoWeeksAgo = new Date();
-          twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-          if (createdAt < twoWeeksAgo) continue;
-        }
+      if (submitted) continue;
 
-        const subRes = await fetch(
-          `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork/${assignment.id}/studentSubmissions`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-        const subData = await subRes.json();
-        const submission = subData.studentSubmissions?.[0];
-        const submissionState = submission?.state || "NEW";
-        const submitted =
-          submissionState === "TURNED_IN" ||
-          submissionState === "SUBMITTED" ||
-          submissionState === "RETURNED";
-
-        if (submitted) continue;
-
-        const isNew = await tryInsertNotification(assignment.id, user.user_id, "new");
-        if (isNew) {
-          const driveFileIds: string[] = [];
-          if (assignment.materials) {
-            for (const material of assignment.materials) {
-              if (material.driveFile?.driveFile?.id) {
-                driveFileIds.push(material.driveFile.driveFile.id);
-              }
-            }
-          }
-          // Gemini summarization is slow — fire and forget
-          fetch(`${process.env.CLOUD_RUN_URL}/process`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "x-internal-secret": process.env.CLOUD_RUN_SECRET! },
-            body: JSON.stringify({
-              assignment,
-              course,
-              user_id: user.user_id,
-              reminderMinutes,
-              accessToken,
-              driveFileIds,
-              discord_user_id: discordUserId,
-            }),
-          }).catch((e) => console.error("Cloud Run /process error:", e));
-        }
-
-        if (assignment.dueDate) {
-          const dueWithTime = new Date(Date.UTC(
-            assignment.dueDate.year,
-            assignment.dueDate.month - 1,
-            assignment.dueDate.day,
-            assignment.dueTime?.hours ?? 14,
-            assignment.dueTime != null ? (assignment.dueTime.minutes ?? 0) : 59
-          ));
-          const now = new Date();
-          const diffMinutes = (dueWithTime.getTime() - now.getTime()) / 60000;
-
-          if (diffMinutes > 0 && diffMinutes <= 24 * 60) {
-            const is24h = await tryInsertNotification(assignment.id, user.user_id, "24h");
-            if (is24h) {
-              await callCloudRun("/process-classroom-reminder", {
-                assignment_title: assignment.title,
-                course_name: course.name,
-                due: dueWithTime.toISOString(),
-                notification_type: "24h",
-                discord_user_id: discordUserId,
-              });
-            }
-          }
-
-          if (diffMinutes > 0 && diffMinutes <= reminderMinutes && reminderMinutes < 22 * 60) {
-            const isReminder = await tryInsertNotification(assignment.id, user.user_id, "reminder");
-            if (isReminder) {
-              await callCloudRun("/process-classroom-reminder", {
-                assignment_title: assignment.title,
-                course_name: course.name,
-                due: dueWithTime.toISOString(),
-                notification_type: "reminder",
-                discord_user_id: discordUserId,
-              });
-            }
+      const driveFileIds: string[] = [];
+      if (assignment.materials) {
+        for (const material of assignment.materials) {
+          if (material.driveFile?.driveFile?.id) {
+            driveFileIds.push(material.driveFile.driveFile.id);
           }
         }
       }
+      pending.push(
+        notifyOnce(assignment.id, user.user_id, "new", "/process", {
+          assignment,
+          course,
+          user_id: user.user_id,
+          reminderMinutes,
+          accessToken,
+          driveFileIds,
+          discord_user_id: discordUserId,
+        })
+      );
 
-      if (notifyAnnouncements) {
-        const annRes = await fetch(
-          `https://classroom.googleapis.com/v1/courses/${course.id}/announcements?orderBy=updateTime%20desc`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-        const annData = await annRes.json();
-        const announcements = annData.announcements || [];
+      if (assignment.dueDate) {
+        const dueWithTime = new Date(Date.UTC(
+          assignment.dueDate.year,
+          assignment.dueDate.month - 1,
+          assignment.dueDate.day,
+          assignment.dueTime?.hours ?? 14,
+          assignment.dueTime != null ? (assignment.dueTime.minutes ?? 0) : 59
+        ));
+        const diffMinutes = (dueWithTime.getTime() - Date.now()) / 60000;
 
-        for (const announcement of announcements) {
-          const createdAt = new Date(announcement.creationTime);
-          const twoWeeksAgo = new Date();
-          twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-          if (createdAt < twoWeeksAgo) continue;
-
-          const isAnn = await tryInsertNotification(announcement.id, user.user_id, "announcement");
-          if (isAnn) {
-            await callCloudRun("/process-announcement", {
-              announcement,
-              course,
-              user_id: user.user_id,
-              discord_user_id: discordUserId,
-            });
-          }
+        if (diffMinutes > 0 && diffMinutes <= 24 * 60) {
+          await notifyOnce(assignment.id, user.user_id, "24h", "/process-classroom-reminder", {
+            assignment_title: assignment.title,
+            course_name: course.name,
+            due: dueWithTime.toISOString(),
+            notification_type: "24h",
+            discord_user_id: discordUserId,
+          });
         }
-      }
 
-      if (notifyMaterials) {
-        const matRes = await fetch(
-          `https://classroom.googleapis.com/v1/courses/${course.id}/courseWorkMaterials?orderBy=updateTime%20desc`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-        const matData = await matRes.json();
-        const materials = matData.courseWorkMaterial || [];
-
-        for (const material of materials) {
-          const createdAt = new Date(material.creationTime);
-          const twoWeeksAgo = new Date();
-          twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-          if (createdAt < twoWeeksAgo) continue;
-
-          const isMat = await tryInsertNotification(material.id, user.user_id, "material");
-          if (isMat) {
-            const driveFileIds: string[] = [];
-            if (material.materials) {
-              for (const m of material.materials) {
-                if (m.driveFile?.driveFile?.id) driveFileIds.push(m.driveFile.driveFile.id);
-              }
-            }
-            // Gemini summarization is slow — fire and forget
-            fetch(`${process.env.CLOUD_RUN_URL}/process-material`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "x-internal-secret": process.env.CLOUD_RUN_SECRET! },
-              body: JSON.stringify({ material, course, user_id: user.user_id, accessToken, driveFileIds, discord_user_id: discordUserId }),
-            }).catch((e) => console.error("Cloud Run /process-material error:", e));
-          }
+        if (diffMinutes > 0 && diffMinutes <= reminderMinutes && reminderMinutes < 22 * 60) {
+          await notifyOnce(assignment.id, user.user_id, "reminder", "/process-classroom-reminder", {
+            assignment_title: assignment.title,
+            course_name: course.name,
+            due: dueWithTime.toISOString(),
+            notification_type: "reminder",
+            discord_user_id: discordUserId,
+          });
         }
       }
     }
 
+    if (notifyAnnouncements) {
+      const annData = await fetchGoogle(
+        `https://classroom.googleapis.com/v1/courses/${course.id}/announcements?orderBy=updateTime%20desc`,
+        accessToken
+      );
+      const announcements = annData.announcements || [];
+
+      for (const announcement of announcements) {
+        const createdAt = new Date(announcement.creationTime);
+        if (createdAt < twoWeeksAgo) continue;
+
+        await notifyOnce(announcement.id, user.user_id, "announcement", "/process-announcement", {
+          announcement,
+          course,
+          user_id: user.user_id,
+          discord_user_id: discordUserId,
+        });
+      }
+    }
+
+    if (notifyMaterials) {
+      const matData = await fetchGoogle(
+        `https://classroom.googleapis.com/v1/courses/${course.id}/courseWorkMaterials?orderBy=updateTime%20desc`,
+        accessToken
+      );
+      const materials = matData.courseWorkMaterial || [];
+
+      for (const material of materials) {
+        const createdAt = new Date(material.creationTime);
+        if (createdAt < twoWeeksAgo) continue;
+
+        const driveFileIds: string[] = [];
+        if (material.materials) {
+          for (const m of material.materials) {
+            if (m.driveFile?.driveFile?.id) driveFileIds.push(m.driveFile.driveFile.id);
+          }
+        }
+        pending.push(
+          notifyOnce(material.id, user.user_id, "material", "/process-material", {
+            material,
+            course,
+            user_id: user.user_id,
+            accessToken,
+            driveFileIds,
+            discord_user_id: discordUserId,
+          })
+        );
+      }
+    }
+  }
+
+  async function processCustom(): Promise<void> {
     // ---- 繰り返し課題の自動生成（出題曜日当日に1件生成 + 新着通知） ----
     const { data: recurringTemplates } = await supabase
       .from("recurring_assignments")
@@ -312,14 +403,11 @@ export async function GET(request: Request) {
 
         if (!assignmentId) continue;
 
-        const isCustomNew = await tryInsertNotification(assignmentId, user.user_id, "custom_new");
-        if (isCustomNew) {
-          await callCloudRun("/process-custom-reminder", {
-            assignment: { id: assignmentId, title: template.title, course_name: template.course_name, due_date: dueDateStr, due_time: template.due_time ?? "23:59" },
-            reminderType: "new",
-            discord_user_id: discordUserId,
-          });
-        }
+        await notifyOnce(assignmentId, user.user_id, "custom_new", "/process-custom-reminder", {
+          assignment: { id: assignmentId, title: template.title, course_name: template.course_name, due_date: dueDateStr, due_time: template.due_time ?? "23:59" },
+          reminderType: "new",
+          discord_user_id: discordUserId,
+        });
       }
     }
 
@@ -340,30 +428,22 @@ export async function GET(request: Request) {
         if (diffMinutes < 0) continue;
 
         if (diffMinutes <= 24 * 60) {
-          const isCustom24h = await tryInsertNotification(assignment.id, user.user_id, "custom_24h");
-          if (isCustom24h) {
-            await callCloudRun("/process-custom-reminder", {
-              assignment,
-              reminderType: "24h",
-              discord_user_id: discordUserId,
-            });
-          }
+          await notifyOnce(assignment.id, user.user_id, "custom_24h", "/process-custom-reminder", {
+            assignment,
+            reminderType: "24h",
+            discord_user_id: discordUserId,
+          });
         }
 
         if (diffMinutes <= reminderMinutes && reminderMinutes < 22 * 60) {
-          const isCustomReminder = await tryInsertNotification(assignment.id, user.user_id, "custom_reminder");
-          if (isCustomReminder) {
-            await callCloudRun("/process-custom-reminder", {
-              assignment,
-              reminderType: "reminder",
-              reminderMinutes,
-              discord_user_id: discordUserId,
-            });
-          }
+          await notifyOnce(assignment.id, user.user_id, "custom_reminder", "/process-custom-reminder", {
+            assignment,
+            reminderType: "reminder",
+            reminderMinutes,
+            discord_user_id: discordUserId,
+          });
         }
       }
     }
   }
-
-  return NextResponse.json({ message: "Done" });
 }

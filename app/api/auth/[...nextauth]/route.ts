@@ -31,6 +31,14 @@ export const authOptions = {
             refresh_token: account.refresh_token,
             expires_at: account.expires_at,
           }, { onConflict: "user_id" });
+        if (error) console.error("Failed to save user_tokens:", error);
+
+        // 再ログインしたので、cron の「再ログインしてください」通知をリセットする
+        await supabase
+          .from("notified_assignments")
+          .delete()
+          .eq("user_id", token.sub)
+          .eq("notification_type", "reauth_required");
       }
 
       if (Date.now() < (token.expiresAt as number) * 1000) {
@@ -49,6 +57,12 @@ export const authOptions = {
           }),
         });
         const tokens = await response.json();
+        if (!tokens.access_token) {
+          // refresh_token が失効している（テストモードの OAuth アプリは7日で失効）。
+          // DB を undefined/NaN で上書きしないよう、ここで打ち切る
+          token.error = "RefreshTokenError";
+          return token;
+        }
         token.accessToken = tokens.access_token;
         token.expiresAt = Math.floor(Date.now() / 1000 + tokens.expires_in);
 
