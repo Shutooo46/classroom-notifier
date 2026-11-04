@@ -10,6 +10,31 @@ function redirectWithClearedState(url: string) {
   return res;
 }
 
+/**
+ * 通知用サーバーにユーザーを参加させる（既に参加済みなら何もしない）。
+ * Discord では Bot と共通のサーバーがないユーザーに DM を送れない（エラー 50278）ため。
+ * Bot がそのサーバーで「招待を作成」権限を持っている必要がある。
+ */
+async function joinNotificationGuild(discordUserId: string, userAccessToken: string): Promise<void> {
+  const guildId = process.env.DISCORD_GUILD_ID;
+  if (!guildId) {
+    console.warn("DISCORD_GUILD_ID is not set; skipping auto-join");
+    return;
+  }
+  const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${discordUserId}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ access_token: userAccessToken }),
+  });
+  // 201 = 参加させた, 204 = 既に参加済み
+  if (!res.ok) {
+    console.error(`Failed to add user to notification guild: ${res.status}`, await res.text().catch(() => ""));
+  }
+}
+
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/?error=auth`);
@@ -44,6 +69,8 @@ export async function GET(request: Request) {
   });
   const discordUser = await userRes.json();
   if (!discordUser.id) return redirectWithClearedState(`${process.env.NEXTAUTH_URL}/?error=discord`);
+
+  await joinNotificationGuild(discordUser.id, tokenData.access_token);
 
   const userId = (session as any).userId;
   await supabase.from("user_settings").upsert(
