@@ -196,7 +196,6 @@ export async function syncLmsAssignments(
   onNew: (row: LmsAssignmentRow, uid: string) => Promise<void>
 ): Promise<{ added: number; updated: number }> {
   const now = Date.now();
-  const upcoming = events.filter((e) => e.due.getTime() > now);
 
   const { data: existingRows } = await supabase
     .from("custom_assignments")
@@ -215,7 +214,9 @@ export async function syncLmsAssignments(
   let added = 0;
   let updated = 0;
 
-  for (const event of upcoming) {
+  // 期限切れの課題も、取り込み済みなら題名・授業名の更新はする（新規追加と通知は今後の課題だけ）
+  for (const event of events) {
+    const isUpcoming = event.due.getTime() > now;
     const { due_date, due_time } = toJst(event.due);
     const courseName = displayCourseName(event.courseCode, courseNames);
     const externalCourse = event.courseCode || null;
@@ -243,12 +244,13 @@ export async function syncLmsAssignments(
             .in("notification_type", ["custom_24h", "custom_reminder"]);
         }
       }
-      if (!seen.has(lmsNotificationId(event.uid))) {
+      if (isUpcoming && !seen.has(lmsNotificationId(event.uid))) {
         await onNew({ id: existing.id, title: event.title, course_name: courseName, due_date, due_time }, event.uid);
       }
       continue;
     }
 
+    if (!isUpcoming) continue;
     // 既読マークがあるのに行がない = 利用者が削除した
     if (seen.has(lmsNotificationId(event.uid))) continue;
 
@@ -297,7 +299,9 @@ export async function applyCourseNames(userId: string, courseNames: LmsCourseNam
     .eq("user_id", userId)
     .eq("source", "lms");
   for (const row of rows ?? []) {
-    const name = displayCourseName((row.external_course as string | null) ?? "", courseNames);
+    // 授業コードが未記録の行（コード保存前に取り込んだもの）は次回の同期で埋まるので触らない
+    if (!row.external_course) continue;
+    const name = displayCourseName(row.external_course as string, courseNames);
     if (row.course_name !== name) {
       await supabase.from("custom_assignments").update({ course_name: name }).eq("id", row.id);
     }
