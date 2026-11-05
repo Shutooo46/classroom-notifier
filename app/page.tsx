@@ -1065,13 +1065,46 @@ function PickerColumn({ values, selected, onChange, label }: {
 // ---- 学校ポータル（Moodle）カレンダー連携 ----
 function LmsSection() {
   const [status, setStatus] = useState<{ connected: boolean; host: string | null } | null>(null);
+  const [courses, setCourses] = useState<{ code: string; name: string }[]>([]);
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+  const [courseMessage, setCourseMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+
+  const load = useCallback(() => {
+    fetch("/api/lms")
+      .then((r) => r.json())
+      .then((data) => {
+        setStatus({ connected: Boolean(data.connected), host: data.host ?? null });
+        setCourses(Array.isArray(data.courses) ? data.courses : []);
+      })
+      .catch(() => setStatus({ connected: false, host: null }));
+  }, []);
 
   useEffect(() => {
-    fetch("/api/lms").then((r) => r.json()).then(setStatus).catch(() => setStatus({ connected: false, host: null }));
-  }, []);
+    load();
+  }, [load]);
+
+  const saveCourseNames = async () => {
+    setBusy(true);
+    setCourseMessage(null);
+    try {
+      const course_names = Object.fromEntries(courses.map((c) => [c.code, c.name]));
+      const res = await fetch("/api/lms", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ course_names }),
+      });
+      const data = await res.json();
+      setCourseMessage(res.ok
+        ? { type: "ok", text: "保存しました。ページを再読み込みすると一覧に反映されます。" }
+        : { type: "error", text: data.error ?? "保存に失敗しました" });
+    } catch {
+      setCourseMessage({ type: "error", text: "保存に失敗しました" });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const connect = async () => {
     setBusy(true);
@@ -1088,7 +1121,7 @@ function LmsSection() {
         return;
       }
       setUrl("");
-      setStatus({ connected: true, host: new URL(url.trim()).hostname });
+      load();
       setMessage({ type: "ok", text: `${data.imported}件の課題を取り込みました。ページを再読み込みすると一覧に表示されます。` });
     } catch {
       setMessage({ type: "error", text: "連携に失敗しました" });
@@ -1148,6 +1181,36 @@ function LmsSection() {
         )}
         {message && (
           <p className={`text-xs ${message.type === "ok" ? "text-green-600 dark:text-[#c8f135]" : "text-red-500"}`}>{message.text}</p>
+        )}
+        {status?.connected && courses.length > 0 && (
+          <div className="space-y-2 pt-1">
+            <p className="text-sm font-semibold text-black dark:text-white">授業名</p>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              ポータルからは授業コードしか届かないため、授業名を登録してください。一覧と Discord 通知に使われます。
+            </p>
+            {courses.map((course, i) => (
+              <div key={course.code} className="flex items-center gap-2">
+                <span className="text-xs text-gray-400 font-mono shrink-0 w-32 truncate" title={course.code}>{course.code}</span>
+                <input
+                  type="text"
+                  value={course.name}
+                  maxLength={255}
+                  onChange={(e) => setCourses((prev) => prev.map((c, j) => (j === i ? { ...c, name: e.target.value } : c)))}
+                  placeholder="授業名（例: 情報科学概論）"
+                  className="flex-1 min-w-0 text-xs px-3 py-2 rounded-xl border-2 border-black dark:border-[#555] bg-white dark:bg-[#2a2a2a] text-black dark:text-white"
+                />
+              </div>
+            ))}
+            <div className="flex items-center justify-end gap-3">
+              {courseMessage && (
+                <p className={`text-xs ${courseMessage.type === "ok" ? "text-green-600 dark:text-[#c8f135]" : "text-red-500"}`}>{courseMessage.text}</p>
+              )}
+              <button onClick={saveCourseNames} disabled={busy}
+                className="text-xs px-3 py-1.5 rounded-full border-2 border-black bg-[#c8f135] text-black font-semibold hover:opacity-80 transition-opacity disabled:opacity-50 shrink-0">
+                保存
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>

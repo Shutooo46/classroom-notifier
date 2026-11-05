@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import {
   LMS_REAUTH_NOTIFICATION_TYPE,
   LMS_SEEN_NOTIFICATION_TYPE,
+  LmsCourseNames,
   LmsUrlError,
   fetchLmsEvents,
   lmsNotificationId,
@@ -167,10 +168,11 @@ async function processUser(user: UserToken, pending: Promise<void>[]): Promise<v
   // 列が未作成（マイグレーション前）でも他の通知に影響しないよう、別クエリで取得する
   const { data: lmsSettings } = await supabase
     .from("user_settings")
-    .select("lms_ical_url")
+    .select("lms_ical_url, lms_course_names")
     .eq("user_id", user.user_id)
     .maybeSingle();
   const lmsIcalUrl: string | null = lmsSettings?.lms_ical_url ?? null;
+  const lmsCourseNames: LmsCourseNames = lmsSettings?.lms_course_names ?? {};
 
   // ポータルの課題は custom_assignments に入るので、同じ実行でリマインドも判定されるよう先に同期する
   if (lmsIcalUrl) {
@@ -196,7 +198,7 @@ async function processUser(user: UserToken, pending: Promise<void>[]): Promise<v
   async function processLms(url: string): Promise<void> {
     const events = await fetchLmsEvents(url);
     await releaseNotification(LMS_REAUTH_NOTIFICATION_TYPE, user.user_id, LMS_REAUTH_NOTIFICATION_TYPE);
-    await syncLmsAssignments(user.user_id, events, async (row, uid) => {
+    await syncLmsAssignments(user.user_id, events, lmsCourseNames, async (row, uid) => {
       await notifyOnce(lmsNotificationId(uid), user.user_id, LMS_SEEN_NOTIFICATION_TYPE, "/process-custom-reminder", {
         assignment: row,
         reminderType: "lms_new",

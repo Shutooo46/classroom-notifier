@@ -5,10 +5,13 @@ import { supabase } from "@/lib/supabase";
 import {
   LMS_REAUTH_NOTIFICATION_TYPE,
   LMS_SEEN_NOTIFICATION_TYPE,
+  LmsCourseNames,
   LmsUrlError,
+  applyCourseNames,
   fetchLmsEvents,
   lmsNotificationId,
   normalizeLmsUrl,
+  sanitizeCourseNames,
   syncLmsAssignments,
 } from "@/lib/lms";
 
@@ -18,7 +21,19 @@ async function getUserId(): Promise<string | null> {
   return session ? ((session as any).userId as string) : null;
 }
 
-/** 連携状態を返す。URL にはトークンが含まれるのでクライアントには返さない */
+async function getCourseNames(userId: string): Promise<LmsCourseNames> {
+  const { data } = await supabase
+    .from("user_settings")
+    .select("lms_course_names")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return (data?.lms_course_names as LmsCourseNames | null) ?? {};
+}
+
+/**
+ * 連携状態と、取り込んだ課題に出てくる授業コードの一覧を返す。
+ * URL にはトークンが含まれるのでクライアントには返さない
+ */
 export async function GET() {
   const userId = await getUserId();
   if (!userId) return NextResponse.json({ error: "ログインが必要です" }, { status: 401 });
@@ -28,12 +43,43 @@ export async function GET() {
     .select("lms_ical_url")
     .eq("user_id", userId)
     .maybeSingle();
+  const courseNames = await getCourseNames(userId);
+
+  const { data: rows } = await supabase
+    .from("custom_assignments")
+    .select("external_course")
+    .eq("user_id", userId)
+    .eq("source", "lms")
+    .not("external_course", "is", null);
+  const codes = [...new Set([...(rows ?? []).map((r) => r.external_course as string), ...Object.keys(courseNames)])].sort();
 
   const url = data?.lms_ical_url as string | null | undefined;
   return NextResponse.json({
     connected: Boolean(url),
     host: url ? new URL(url).hostname : null,
+    courses: codes.map((code) => ({ code, name: courseNames[code] ?? "" })),
   });
+}
+
+/** 授業コード → 授業名の対応を保存し、取り込み済みの課題に反映する */
+export async function PUT(request: Request) {
+  const userId = await getUserId();
+  if (!userId) return NextResponse.json({ error: "ログインが必要です" }, { status: 401 });
+
+  const body = await request.json().catch(() => ({}));
+  const courseNames = sanitizeCourseNames(body.course_names);
+  if (!courseNames) return NextResponse.json({ error: "授業名の形式が正しくありません" }, { status: 400 });
+
+  const { error } = await supabase
+    .from("user_settings")
+    .upsert({ user_id: userId, lms_course_names: courseNames }, { onConflict: "user_id" });
+  if (error) {
+    console.error("Failed to save lms_course_names:", error);
+    return NextResponse.json({ error: "保存に失敗しました" }, { status: 500 });
+  }
+
+  await applyCourseNames(userId, courseNames);
+  return NextResponse.json({ success: true });
 }
 
 /** URL を検証して保存し、今ある課題を通知なしで取り込む */
@@ -66,7 +112,7 @@ export async function POST(request: Request) {
   }
 
   // 初回はまとめて DM が飛ばないよう、取り込んだ課題を「通知済み」にしておく
-  const { added } = await syncLmsAssignments(userId, events, async (_row, uid) => {
+  const { added } = await syncLmsAssignments(userId, events, await getCourseNames(userId), async (_row, uid) => {
     await supabase.from("notified_assignments").upsert(
       {
         assignment_id: lmsNotificationId(uid),

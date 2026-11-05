@@ -44,9 +44,37 @@ export function normalizeLmsUrl(input: string): string {
 export type LmsEvent = {
   uid: string;
   title: string;
-  courseName: string;
+  /** iCal の CATEGORIES（Moodle ではコースの短縮名。例: 2026_0010010109）。ない場合は空文字 */
+  courseCode: string;
   due: Date;
 };
+
+/** 授業コード → 利用者が登録した授業名 */
+export type LmsCourseNames = Record<string, string>;
+
+const FALLBACK_COURSE_NAME = "ポータル";
+
+export function displayCourseName(code: string, courseNames: LmsCourseNames): string {
+  return courseNames[code]?.trim() || code || FALLBACK_COURSE_NAME;
+}
+
+/**
+ * Moodle が付ける定型文を外して課題名だけにする。
+ * 例: 「「第6回課題」の提出期限」→「第6回課題」、「Report 1 is due」→「Report 1」
+ */
+export function cleanLmsTitle(title: string): string {
+  const t = title.trim();
+  const patterns = [
+    /^「(.+)」\s*の提出期限$/,
+    /^(.+?)\s*の提出期限$/,
+    /^(.+?)\s+is due$/i,
+  ];
+  for (const re of patterns) {
+    const m = re.exec(t);
+    if (m && m[1].trim()) return m[1].trim();
+  }
+  return t;
+}
 
 function unescapeText(value: string): string {
   return value
@@ -99,8 +127,8 @@ export function parseIcal(text: string): LmsEvent[] {
         if (uid && summary && due && !isOpeningEvent(unescapeText(summary))) {
           events.push({
             uid,
-            title: unescapeText(summary).slice(0, 255),
-            courseName: unescapeText(current.CATEGORIES?.value ?? "").slice(0, 255) || "ポータル",
+            title: cleanLmsTitle(unescapeText(summary)).slice(0, 255),
+            courseCode: unescapeText(current.CATEGORIES?.value ?? "").slice(0, 255),
             due,
           });
         }
@@ -164,6 +192,7 @@ export type LmsAssignmentRow = {
 export async function syncLmsAssignments(
   userId: string,
   events: LmsEvent[],
+  courseNames: LmsCourseNames,
   onNew: (row: LmsAssignmentRow, uid: string) => Promise<void>
 ): Promise<{ added: number; updated: number }> {
   const now = Date.now();
@@ -171,7 +200,7 @@ export async function syncLmsAssignments(
 
   const { data: existingRows } = await supabase
     .from("custom_assignments")
-    .select("id, external_id, title, course_name, due_date, due_time")
+    .select("id, external_id, external_course, title, course_name, due_date, due_time")
     .eq("user_id", userId)
     .eq("source", "lms");
   const rowsByUid = new Map((existingRows ?? []).map((r) => [r.external_id as string, r]));
@@ -188,14 +217,21 @@ export async function syncLmsAssignments(
 
   for (const event of upcoming) {
     const { due_date, due_time } = toJst(event.due);
+    const courseName = displayCourseName(event.courseCode, courseNames);
+    const externalCourse = event.courseCode || null;
     const existing = rowsByUid.get(event.uid);
 
     if (existing) {
       const dueChanged = existing.due_date !== due_date || existing.due_time !== due_time;
-      if (dueChanged || existing.title !== event.title || existing.course_name !== event.courseName) {
+      if (
+        dueChanged ||
+        existing.title !== event.title ||
+        existing.course_name !== courseName ||
+        existing.external_course !== externalCourse
+      ) {
         await supabase
           .from("custom_assignments")
-          .update({ title: event.title, course_name: event.courseName, due_date, due_time })
+          .update({ title: event.title, course_name: courseName, external_course: externalCourse, due_date, due_time })
           .eq("id", existing.id);
         updated++;
         if (dueChanged) {
@@ -208,7 +244,7 @@ export async function syncLmsAssignments(
         }
       }
       if (!seen.has(lmsNotificationId(event.uid))) {
-        await onNew({ id: existing.id, title: event.title, course_name: event.courseName, due_date, due_time }, event.uid);
+        await onNew({ id: existing.id, title: event.title, course_name: courseName, due_date, due_time }, event.uid);
       }
       continue;
     }
@@ -221,11 +257,12 @@ export async function syncLmsAssignments(
       .insert({
         user_id: userId,
         title: event.title,
-        course_name: event.courseName,
+        course_name: courseName,
         due_date,
         due_time,
         source: "lms",
         external_id: event.uid,
+        external_course: externalCourse,
       })
       .select("id, title, course_name, due_date, due_time")
       .single();
@@ -238,4 +275,31 @@ export async function syncLmsAssignments(
   }
 
   return { added, updated };
+}
+
+export function sanitizeCourseNames(input: unknown): LmsCourseNames | null {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const result: LmsCourseNames = {};
+  for (const [code, name] of Object.entries(input as Record<string, unknown>)) {
+    if (typeof name !== "string" || code.length > 255) return null;
+    const trimmed = name.trim();
+    if (trimmed.length > 255) return null;
+    if (trimmed) result[code] = trimmed;
+  }
+  return result;
+}
+
+/** 授業名の登録を、取り込み済みの課題にすぐ反映する */
+export async function applyCourseNames(userId: string, courseNames: LmsCourseNames): Promise<void> {
+  const { data: rows } = await supabase
+    .from("custom_assignments")
+    .select("id, external_course, course_name")
+    .eq("user_id", userId)
+    .eq("source", "lms");
+  for (const row of rows ?? []) {
+    const name = displayCourseName((row.external_course as string | null) ?? "", courseNames);
+    if (row.course_name !== name) {
+      await supabase.from("custom_assignments").update({ course_name: name }).eq("id", row.id);
+    }
+  }
 }
