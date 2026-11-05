@@ -69,6 +69,16 @@ function parseIcalDate(value: string, params: string): Date | null {
   return new Date(m[7] ? `${iso}Z` : `${iso}+09:00`);
 }
 
+/**
+ * Moodle は小テスト等の「受付開始」も別イベントとして出力する（例: 「小テスト1 開始」「Quiz 1 opens」）。
+ * 締め切りではないので取り込まない。
+ */
+const OPENING_EVENT_RE = /(\s+opens|\s*開始)$/i;
+
+export function isOpeningEvent(title: string): boolean {
+  return OPENING_EVENT_RE.test(title.trim());
+}
+
 export function parseIcal(text: string): LmsEvent[] {
   // 行の折り返し（CRLF + 空白）を戻す
   const lines = text.replace(/\r\n/g, "\n").replace(/\n[ \t]/g, "").split("\n");
@@ -86,7 +96,7 @@ export function parseIcal(text: string): LmsEvent[] {
         const summary = current.SUMMARY?.value;
         const dt = current.DTEND ?? current.DTSTART;
         const due = dt ? parseIcalDate(dt.value, dt.params) : null;
-        if (uid && summary && due) {
+        if (uid && summary && due && !isOpeningEvent(unescapeText(summary))) {
           events.push({
             uid,
             title: unescapeText(summary).slice(0, 255),
