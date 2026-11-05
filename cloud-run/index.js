@@ -374,6 +374,9 @@ app.post("/process-custom-reminder", async (req, res) => {
     if (reminderType === "new") {
       title = "🔄 繰り返し課題が出題されました";
       color = 0x4285f4;
+    } else if (reminderType === "lms_new") {
+      title = "🏫 ポータルに新しい課題が追加されました";
+      color = 0xf98012;
     } else if (reminderType === "reminder") {
       const dueDate = assignment.due_date
         ? new Date(`${assignment.due_date}T${assignment.due_time ?? "23:59"}:00+09:00`)
@@ -408,20 +411,29 @@ app.post("/process-custom-reminder", async (req, res) => {
 });
 
 app.post("/process-reauth", async (req, res) => {
-  const { discord_user_id, login_url } = req.body;
+  const { discord_user_id, login_url, kind } = req.body;
   if (!discord_user_id) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
   try {
-    const embed = {
-      title: "🔑 再ログインが必要です",
-      color: 0x9e9e9e,
-      description:
-        "Google の認証が切れたため、Classroom の課題・お知らせを取得できなくなっています。\n" +
-        "下のリンクからもう一度ログインすると通知が再開します。" +
-        (login_url ? `\n\n${login_url}` : ""),
-    };
+    const embed = kind === "lms"
+      ? {
+          title: "🔑 ポータルの再連携が必要です",
+          color: 0x9e9e9e,
+          description:
+            "学校ポータルのカレンダーURLが無効になったため、ポータルの課題を取得できなくなっています。\n" +
+            "ポータルでカレンダーURLを取得し直し、設定画面から登録し直してください。" +
+            (login_url ? `\n\n${login_url}` : ""),
+        }
+      : {
+          title: "🔑 再ログインが必要です",
+          color: 0x9e9e9e,
+          description:
+            "Google の認証が切れたため、Classroom の課題・お知らせを取得できなくなっています。\n" +
+            "下のリンクからもう一度ログインすると通知が再開します。" +
+            (login_url ? `\n\n${login_url}` : ""),
+        };
 
     await sendDiscordDM(discord_user_id, embed);
 
