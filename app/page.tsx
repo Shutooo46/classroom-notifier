@@ -1097,7 +1097,7 @@ function LmsSection() {
       });
       const data = await res.json();
       setCourseMessage(res.ok
-        ? { type: "ok", text: "保存しました。ページを再読み込みすると一覧に反映されます。" }
+        ? { type: "ok", text: "保存しました。ページを再読み込みすると授業一覧と課題一覧に反映されます。" }
         : { type: "error", text: data.error ?? "保存に失敗しました" });
     } catch {
       setCourseMessage({ type: "error", text: "保存に失敗しました" });
@@ -1186,7 +1186,7 @@ function LmsSection() {
           <div className="space-y-2 pt-1">
             <p className="text-sm font-semibold text-black dark:text-white">授業名</p>
             <p className="text-xs text-gray-400 leading-relaxed">
-              ポータルからは授業コードしか届かないため、授業名を登録してください。一覧と Discord 通知に使われます。
+              ポータルからは授業コードしか届かないため、授業名を登録してください。授業一覧・課題一覧・Discord 通知に使われます。
             </p>
             {courses.map((course, i) => (
               <div key={course.code} className="flex items-center gap-2">

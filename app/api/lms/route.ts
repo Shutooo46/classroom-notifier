@@ -12,6 +12,7 @@ import {
   lmsNotificationId,
   normalizeLmsUrl,
   sanitizeCourseNames,
+  syncCourseCards,
   syncLmsAssignments,
 } from "@/lib/lms";
 
@@ -69,6 +70,7 @@ export async function PUT(request: Request) {
   const body = await request.json().catch(() => ({}));
   const courseNames = sanitizeCourseNames(body.course_names);
   if (!courseNames) return NextResponse.json({ error: "授業名の形式が正しくありません" }, { status: 400 });
+  const previousCourseNames = await getCourseNames(userId);
 
   const { error } = await supabase
     .from("user_settings")
@@ -79,6 +81,7 @@ export async function PUT(request: Request) {
   }
 
   await applyCourseNames(userId, courseNames);
+  await syncCourseCards(userId, previousCourseNames, courseNames);
   return NextResponse.json({ success: true });
 }
 

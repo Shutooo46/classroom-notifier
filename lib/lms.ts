@@ -307,3 +307,40 @@ export async function applyCourseNames(userId: string, courseNames: LmsCourseNam
     }
   }
 }
+
+/**
+ * 登録した授業名を授業一覧に出すため、同じ名前のカスタム授業を用意する。
+ * 授業名を変えた場合は、元の名前のカスタム授業を新しい名前に付け替える。
+ */
+export async function syncCourseCards(
+  userId: string,
+  previous: LmsCourseNames,
+  next: LmsCourseNames
+): Promise<void> {
+  const { data: existing } = await supabase
+    .from("custom_courses")
+    .select("id, name")
+    .eq("user_id", userId);
+  const byName = new Map((existing ?? []).map((c) => [c.name as string, c.id as string]));
+
+  for (const [code, name] of Object.entries(next)) {
+    if (byName.has(name)) continue;
+    const oldName = previous[code];
+    const oldId = oldName && oldName !== name ? byName.get(oldName) : undefined;
+    // 他の授業コードが同じ旧名を使っていたら付け替えない（そちらのカードが消えてしまう）
+    const oldNameStillUsed = oldName ? Object.values(next).includes(oldName) : false;
+
+    if (oldId && !oldNameStillUsed) {
+      await supabase.from("custom_courses").update({ name }).eq("id", oldId).eq("user_id", userId);
+      byName.delete(oldName);
+      byName.set(name, oldId);
+    } else {
+      const { data } = await supabase
+        .from("custom_courses")
+        .insert({ user_id: userId, name })
+        .select("id")
+        .single();
+      if (data) byName.set(name, data.id as string);
+    }
+  }
+}
